@@ -38,6 +38,7 @@ fun SettingsScreen(
     val currentModel by viewModel.currentBrainModel.collectAsState()
     val githubToken by viewModel.githubToken.collectAsState()
     val aiApiKey by viewModel.aiApiKey.collectAsState()
+    val geminiApiKey by viewModel.geminiApiKey.collectAsState()
     val showClearConfirm by viewModel.showClearConfirm.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val privacyEnabled by viewModel.privacyModeEnabled.collectAsState()
@@ -45,8 +46,10 @@ fun SettingsScreen(
     var showModelDialog by remember { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showGeminiKeyDialog by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf(githubToken) }
     var apiKeyInput by remember { mutableStateOf(aiApiKey) }
+    var geminiKeyInput by remember { mutableStateOf(geminiApiKey) }
     var isTokenVisible by remember { mutableStateOf(false) }
     var isApiKeyVisible by remember { mutableStateOf(false) }
 
@@ -101,6 +104,48 @@ fun SettingsScreen(
                         )
                     } else {
                         Text("未配置 - 点击编辑添加 DeepSeek API Key", fontSize = 13.sp, color = colors.error)
+                    }
+                }
+            }
+
+            // ============ Google Gemini 配置（免费备用模型） ============
+            item { SectionTitle("Google Gemini（免费备用）") }
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.Card))
+                        .background(colors.surface)
+                        .padding(Spacing.CardSpacing)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Google API Key", fontSize = 15.sp, color = colors.textSecondary)
+                            Text("免费模型，DeepSeek 余额不足时自动切换", fontSize = 11.sp, color = colors.textTertiary)
+                        }
+                        IconButton(onClick = { geminiKeyInput = geminiApiKey; showGeminiKeyDialog = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "编辑 Google API Key",
+                                tint = colors.accent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    if (geminiApiKey.isNotBlank()) {
+                        Text(
+                            "${geminiApiKey.take(8)}...${geminiApiKey.takeLast(4)}",
+                            fontSize = 13.sp,
+                            color = colors.success,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else {
+                        Text("未配置 - 点击编辑添加 Google API Key（从 aistudio.google.com 免费获取）", fontSize = 13.sp, color = colors.error)
                     }
                 }
             }
@@ -436,6 +481,51 @@ fun SettingsScreen(
             text = { Text("此操作将清除所有日志和设置，不可恢复！", fontSize = 15.sp, color = colors.textSecondary) },
             confirmButton = { TextButton(onClick = { viewModel.clearAllData() }, colors = ButtonDefaults.textButtonColors(contentColor = colors.error)) { Text("确认清空") } },
             dismissButton = { TextButton(onClick = { viewModel.dismissClearAll() }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // Gemini API Key edit dialog
+    if (showGeminiKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showGeminiKeyDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置 Google API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 aistudio.google.com 免费获取，用于 Gemini 备用模型", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = geminiKeyInput,
+                        onValueChange = { geminiKeyInput = it },
+                        label = { Text("Google API Key", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent,
+                            unfocusedBorderColor = colors.border,
+                            cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.saveGeminiApiKey(geminiKeyInput.trim())
+                        showGeminiKeyDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
+                ) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showGeminiKeyDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
+                ) { Text("取消") }
+            }
         )
     }
 }

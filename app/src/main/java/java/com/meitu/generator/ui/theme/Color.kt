@@ -18,6 +18,10 @@ object LightColors {
     val Error = Color(0xFFCC3333)             // 错误
     val Success = Color(0xFF339933)           // 成功
     val Warning = Color(0xFFCC9933)           // 警告
+    val Online = Color(0xFF339933)            // 在线状态
+    val AccentAlpha12 = Color(0x1FC9A96E)     // 强调色12%透明
+    val TextTertiary = Color(0xFF999999)      // 三级文字
+    val MessageUserText = Color(0xFF000000)   // 用户消息文字(亮色)
 }
 
 // ============ 暗色模式配色 ============
@@ -36,6 +40,10 @@ object DarkColors {
     val Error = Color(0xFFFF5555)            // 错误
     val Success = Color(0xFF55CC55)          // 成功
     val Warning = Color(0xFFFFBB44)          // 警告
+    val Online = Color(0xFF55CC55)           // 在线状态
+    val AccentAlpha12 = Color(0x1FC9A96E)    // 强调色12%透明
+    val TextTertiary = Color(0xFF666666)     // 三级文字
+    val MessageUserText = Color(0xFFFFFFFF)  // 用户消息文字(暗色)
 }
 
 // ============ 兼容旧引用的顶层变量 (暗色模式默认值) ============

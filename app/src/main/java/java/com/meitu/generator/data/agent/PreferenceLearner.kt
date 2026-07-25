@@ -64,7 +64,7 @@ class PreferenceLearner @Inject constructor(
     /**
      * 兼容旧接口 - 从查询文本推断意图并记录
      */
-    fun recordAction(query: String) {
+    fun recordQueryAction(query: String) {
         val intentType = when {
             query.contains("帮我做") || query.contains("做一个") || query.contains("开发") || query.contains("生成") -> "generate"
             query.contains("修改") || query.contains("改一下") || query.contains("更新") || query.contains("修复") -> "modify"

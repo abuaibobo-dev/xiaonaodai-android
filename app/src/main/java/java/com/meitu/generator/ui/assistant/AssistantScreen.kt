@@ -344,7 +344,7 @@ private fun EmptyState() {
     }
 }
 
-// ============ 智能输入栏（集成模型切换+模式切换+发送） ============
+// ============ 智能输入栏（所有控件集成在输入框内） ============
 @Composable
 private fun SmartInputBar(
     inputText: String,
@@ -370,104 +370,28 @@ private fun SmartInputBar(
         Column {
             Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
 
-            // 输入区域主体
+            // 输入区域主体 - 统一的输入框
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(colors.background)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                // 工具栏行（模型切换 + 模式 chips + 图片按钮）
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 左侧：模型选择器
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(colors.surface)
-                            .border(0.5.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                            .clickable { onToggleModelDropdown() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🤖", fontSize = 11.sp)
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                currentModel.replace("deepseek-", "DS ").replace("-v4", "v4"),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = colors.textSecondary,
-                                maxLines = 1
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Text("▾", fontSize = 9.sp, color = colors.textTertiary)
-                        }
-                    }
-
-                    // 右侧：功能 chips + 图片按钮
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SmartModeChip(
-                            icon = "🧠",
-                            label = "思考",
-                            active = deepThinking,
-                            activeColor = Color(0xFF6C5CE7),
-                            onClick = onToggleDeepThinking
-                        )
-                        SmartModeChip(
-                            icon = "🔍",
-                            label = "搜索",
-                            active = webSearch,
-                            activeColor = Color(0xFF00B894),
-                            onClick = onToggleWebSearch
-                        )
-                        // 图片按钮
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
-                                .border(0.5.dp, if (pendingImageUri != null) colors.accent.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.5f), CircleShape)
-                                .clickable { onPickImage() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Image,
-                                contentDescription = "选择图片",
-                                tint = if (pendingImageUri != null) colors.accent else colors.textTertiary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-
-                // 输入行（文本框 + 内嵌发送按钮）
+                // 统一输入框容器（包含文本+所有控件）
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(colors.surface)
-                        .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
+                        .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 4.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        // 文本输入
+                    Column {
+                        // 文本输入区域（更高）
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 40.dp, max = 120.dp)
-                                .padding(horizontal = 14.dp, vertical = 9.dp)
+                                .fillMaxWidth()
+                                .heightIn(min = 72.dp, max = 160.dp)
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
                         ) {
                             androidx.compose.foundation.text.BasicTextField(
                                 value = inputText,
@@ -493,22 +417,101 @@ private fun SmartInputBar(
                             )
                         }
 
-                        // 内嵌发送按钮
+                        // 分割线
                         Box(
                             modifier = Modifier
-                                .padding(bottom = 4.dp, end = 4.dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(if (canSend) colors.accent else Color.Transparent)
-                                .clickable(enabled = canSend) { onSend() },
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .height(0.5.dp)
+                                .background(colors.border.copy(alpha = 0.5f))
+                        )
+
+                        // 底部工具栏（所有控件在这一行）
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Send,
-                                contentDescription = "发送",
-                                tint = if (canSend) Color.White else colors.textTertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            // 左侧：模型选择 + 功能chips + 图片
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 模型选择器
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(colors.background)
+                                        .border(0.5.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .clickable { onToggleModelDropdown() }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🤖", fontSize = 11.sp)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            currentModel.replace("deepseek-", "DS ").replace("-v4", "v4"),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = colors.textSecondary,
+                                            maxLines = 1
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                        Text("▾", fontSize = 9.sp, color = colors.textTertiary)
+                                    }
+                                }
+
+                                SmartModeChip(
+                                    icon = "🧠",
+                                    label = "思考",
+                                    active = deepThinking,
+                                    activeColor = Color(0xFF6C5CE7),
+                                    onClick = onToggleDeepThinking
+                                )
+                                SmartModeChip(
+                                    icon = "🔍",
+                                    label = "搜索",
+                                    active = webSearch,
+                                    activeColor = Color(0xFF00B894),
+                                    onClick = onToggleWebSearch
+                                )
+                                // 图片按钮
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
+                                        .border(0.5.dp, if (pendingImageUri != null) colors.accent.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.5f), CircleShape)
+                                        .clickable { onPickImage() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Image,
+                                        contentDescription = "选择图片",
+                                        tint = if (pendingImageUri != null) colors.accent else colors.textTertiary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+
+                            // 右侧：发送按钮
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(if (canSend) colors.accent else colors.border.copy(alpha = 0.3f))
+                                    .clickable(enabled = canSend) { onSend() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = "发送",
+                                    tint = if (canSend) Color.White else colors.textTertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -520,7 +523,7 @@ private fun SmartInputBar(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 12.dp, top = 40.dp)
+                    .padding(start = 20.dp, top = 100.dp)
             ) {
                 DropdownMenu(
                     expanded = showModelDropdown,
@@ -703,13 +706,20 @@ private fun TextMessageBubble(
                     )
                 }
 
+                // 检测是否为错误消息
+                val isErrorMsg = msg.text.contains("❌") || msg.text.contains("引擎异常") || msg.text.contains("引擎错误") || msg.text.contains("调用失败")
+                val errorColor = Color(0xFFFF4444)
+
                 var renderedTextLen = 0
                 segments.forEach { segment ->
                     when (segment) {
                         is MessageSegment.TextSegment -> {
                             val remaining = (visibleTextLength - renderedTextLen).coerceIn(0, segment.text.length)
                             if (remaining > 0) {
-                                Text(text = segment.text.take(remaining), fontSize = 15.sp, color = if (msg.isUser) colors.messageUserText else colors.messageAiText, lineHeight = 22.sp)
+                                val textColor = if (isErrorMsg) errorColor
+                                    else if (msg.isUser) colors.messageUserText
+                                    else colors.messageAiText
+                                Text(text = segment.text.take(remaining), fontSize = 15.sp, color = textColor, lineHeight = 22.sp)
                             }
                             renderedTextLen += segment.text.length
                         }
@@ -749,9 +759,14 @@ private fun TaskProgressBubble(msg: ChatMessage) {
                 val icon = when (progress.status) { "completed" -> "✅"; "failed" -> "❌"; else -> "🔄" }
                 Text(icon, fontSize = 16.sp)
                 Spacer(Modifier.width(8.dp))
+                val titleColor = when (progress.status) {
+                    "completed" -> colors.success
+                    "failed" -> Color(0xFFFF4444)
+                    else -> colors.textPrimary
+                }
                 Text(
                     when (progress.status) { "completed" -> "编译完成"; "failed" -> "编译失败"; else -> "编译进度" },
-                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary
+                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = titleColor
                 )
             }
             Spacer(Modifier.height(12.dp))
@@ -764,7 +779,12 @@ private fun TaskProgressBubble(msg: ChatMessage) {
                 modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp))
             )
             Spacer(Modifier.height(8.dp))
-            Text(progress.message, fontSize = 12.sp, color = colors.textTertiary)
+            val msgColor = when (progress.status) {
+                "failed" -> Color(0xFFFF4444)
+                "completed" -> colors.success
+                else -> colors.textTertiary
+            }
+            Text(progress.message, fontSize = 12.sp, color = msgColor)
 
             if (progress.status == "completed" && progress.downloadUrl != null) {
                 Spacer(Modifier.height(12.dp))

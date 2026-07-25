@@ -6,13 +6,20 @@ object Constants {
     const val OPENAI_API_KEY = "sk-1d5e7732b3f64e27bfbb896d57bfee2b"
     const val OPENAI_MODEL = "deepseek-v4-flash"
 
+    // ============ Google Gemini API (免费备用) ============
+    const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/"
+    const val GEMINI_API_KEY = "AQ.Ab8RN6LXtF2KynPVFL0V6PzLGJpiqqwxaabvvmgy6Os411GbPQ"
+    const val GEMINI_MODEL = "gemini-2.0-flash"
+    const val KEY_GEMINI_API_KEY = "gemini_api_key"
+
     val AVAILABLE_MODELS = listOf(
         "deepseek-v4-flash",
         "deepseek-v4-pro",
-        "deepseek-r1"
+        "deepseek-r1",
+        "gemini-2.0-flash"
     )
 
-    // 视觉模型 - DeepSeek V4 Vision 已集成在 deepseek-v4-flash 中（2026-06-18上线）
+    // 视觉模型 - DeepSeek V4 Vision + Gemini
     const val VISION_MODEL = "deepseek-v4-flash"
 
     // ============ 通用设置 Keys ============
@@ -43,6 +50,6 @@ object Constants {
 
     // App Info
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "4.5.2"
-    const val APP_VERSION_CODE = 38
+    const val APP_VERSION = "4.5.3"
+    const val APP_VERSION_CODE = 39
 }

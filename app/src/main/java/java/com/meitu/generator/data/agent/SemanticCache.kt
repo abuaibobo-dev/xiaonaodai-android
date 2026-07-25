@@ -231,15 +231,17 @@ class SemanticCache @Inject constructor(
     }
 
     // ============ 存储格式 ============
-    // 格式: output|||tool|||hitCount|||intent
-    // 用 ||| 分隔避免与内容冲突
+    // 格式: output<<<SEP>>>tool<<<SEP>>>hitCount<<<SEP>>>intent
+    // 使用不太可能出现在内容中的分隔符
+
+    private val SEP = "<<<SEP>>>"
 
     private fun buildStoredValue(output: String, tool: String, hitCount: Int, intent: String): String {
-        return "$output|||$tool|||$hitCount|||$intent"
+        return "$output$SEP$tool$SEP$hitCount$SEP$intent"
     }
 
     private fun parseStoredValue(value: String): Map<String, String> {
-        val parts = value.split("|||")
+        val parts = value.split(SEP)
         return mapOf(
             "output" to (parts.getOrNull(0) ?: ""),
             "tool" to (parts.getOrNull(1) ?: ""),

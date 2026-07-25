@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Folder
@@ -22,6 +21,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -101,7 +104,8 @@ fun MainScreen() {
                 },
                 onClearChat = {
                     scope.launch { AppEvents.send("clear_chat") }
-                }
+                },
+                viewModel = assistantViewModel
             )
 
             // ============ 页面内容 ============
@@ -156,11 +160,21 @@ private fun TopAppBar(
     currentRoute: String?,
     onMenuClick: () -> Unit,
     onNewChat: () -> Unit,
-    onClearChat: () -> Unit
+    onClearChat: () -> Unit,
+    viewModel: AssistantViewModel
 ) {
     val colors = LocalAppColors.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
+    val currentModel by viewModel.brainModel.collectAsState()
+
+    // 模型显示名称
+    val modelDisplayName = when (currentModel) {
+        "deepseek-v4-flash" -> "DeepSeek V4 Flash"
+        "deepseek-v4-pro" -> "DeepSeek V4 Pro"
+        "deepseek-r1" -> "DeepSeek R1"
+        else -> currentModel
+    }
 
     Surface(
         color = colors.background,
@@ -168,36 +182,85 @@ private fun TopAppBar(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
+            // 状态栏占位
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(androidx.compose.ui.platform.LocalDensity.current.run {
+                        androidx.compose.ui.platform.LocalContext.current.resources.getIdentifier(
+                            "status_bar_height", "dim", "android"
+                        ).let { if (it > 0) androidx.compose.ui.platform.LocalContext.current.resources.getDimensionPixelSize(it).toDp() else 0.dp }
+                    })
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧：汉堡菜单按钮（设置页隐藏）
                 if (currentRoute != Routes.SETTINGS) {
                     IconButton(
                         onClick = onMenuClick,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Menu,
-                            contentDescription = "菜单",
-                            tint = colors.textPrimary,
-                            modifier = Modifier.size(22.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .drawBehind {
+                                    val strokeW = 1.8.dp.toPx()
+                                    val lineLen = size.width
+                                    val gap = size.height * 0.3f
+                                    val y1 = size.height * 0.2f
+                                    val y2 = size.height * 0.5f
+                                    val y3 = size.height * 0.8f
+                                    val half = strokeW / 2f
+                                    drawLine(
+                                        color = colors.textPrimary,
+                                        start = Offset(0f, y1),
+                                        end = Offset(lineLen, y1),
+                                        strokeWidth = strokeW,
+                                        cap = StrokeCap.Round
+                                    )
+                                    drawLine(
+                                        color = colors.textPrimary,
+                                        start = Offset(0f, y2),
+                                        end = Offset(lineLen, y2),
+                                        strokeWidth = strokeW,
+                                        cap = StrokeCap.Round
+                                    )
+                                    drawLine(
+                                        color = colors.textPrimary,
+                                        start = Offset(0f, y3),
+                                        end = Offset(lineLen, y3),
+                                        strokeWidth = strokeW,
+                                        cap = StrokeCap.Round
+                                    )
+                                }
                         )
                     }
                 }
 
-                // 标题
-                Text(
-                    "布老师",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                )
+                // 标题 + 当前模型
+                Column(
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        "布老师",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                        lineHeight = 20.sp
+                    )
+                    Text(
+                        modelDisplayName,
+                        fontSize = 11.sp,
+                        color = colors.textTertiary,
+                        lineHeight = 14.sp
+                    )
+                }
 
                 // 右侧：状态指示点 + 更多菜单（仅对话页显示）
                 Box(
@@ -212,7 +275,7 @@ private fun TopAppBar(
                     Box {
                         IconButton(
                             onClick = { menuExpanded = true },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 Icons.Default.MoreVert,
@@ -437,6 +500,34 @@ private fun SidebarDrawer(
                         fontWeight = FontWeight.SemiBold,
                         color = colors.accent
                     )
+                }
+                // 一键查询用量
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.accent.copy(alpha = 0.08f))
+                        .clickable {
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://platform.deepseek.com/usage"))
+                                val ctx = androidx.compose.ui.platform.LocalContext.current
+                                ctx.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    Text("🌐", fontSize = 12.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "查询用量明细",
+                        fontSize = 12.sp,
+                        color = colors.accent,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("›", fontSize = 14.sp, color = colors.accent)
                 }
                 Box(
                     modifier = Modifier

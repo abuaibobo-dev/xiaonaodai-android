@@ -87,6 +87,10 @@ class SettingsViewModel @Inject constructor(
         emit(securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "")
     }.stateIn(viewModelScope, SharingStarted.Lazily, "")
 
+    val geminiApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
     private val _showClearConfirm = MutableStateFlow(false)
     val showClearConfirm: StateFlow<Boolean> = _showClearConfirm.asStateFlow()
 
@@ -108,6 +112,11 @@ class SettingsViewModel @Inject constructor(
     fun saveApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_AI_API_KEY, key).apply()
         _toastMessage.value = "API Key 已保存"
+    }
+
+    fun saveGeminiApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_GEMINI_API_KEY, key).apply()
+        _toastMessage.value = "Google API Key 已保存"
     }
 
     fun clearCache() {

@@ -9,6 +9,7 @@ import com.meitu.generator.data.local.dao.PlanDao
 import com.meitu.generator.data.local.entity.PlanEntity
 import com.meitu.generator.data.model.AgentMessage
 import com.meitu.generator.data.model.ToolContext
+import com.meitu.generator.data.remote.GeminiService
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.data.tools.BuildProgressCallback
@@ -33,6 +34,7 @@ class AgentEngine @Inject constructor(
     private val skillRegistry: SkillRegistry,
     private val agentMemory: AgentMemory,
     private val openAIService: OpenAIService,
+    private val geminiService: GeminiService,
     private val planDao: PlanDao,
     private val semanticCache: SemanticCache,
     private val memoryCompressor: MemoryCompressor,
@@ -138,16 +140,16 @@ class AgentEngine @Inject constructor(
         preferenceLearner.recordAction(
             intentType = intent.type.name.lowercase(),
             modelUsed = effectiveModel,
-            deepThinkingEnabled = deepThinkingEnabled,
-            webSearchEnabled = webSearchEnabled,
+            deepThinkingOn = deepThinkingEnabled,
+            webSearchOn = webSearchEnabled,
             hasImage = hasImage,
             responseLength = result.length
         )
         preferenceLearner.analyzeAndLearn()
 
         CloudBuildTool.progressCallback.remove()
-        statusCallback = null
-        thinkingCallback = null
+        this.statusCallback = null
+        this.thinkingCallback = null
 
         return result
     }
@@ -155,7 +157,7 @@ class AgentEngine @Inject constructor(
     /**
      * 根据场景选择模型
      */
-    private fun resolveModel(imageBase64: String?, deepThinkingEnabled: Boolean): String {
+    private suspend fun resolveModel(imageBase64: String?, deepThinkingEnabled: Boolean): String {
         // 有图片 → 视觉模型
         if (imageBase64 != null) {
             return Constants.VISION_MODEL
@@ -188,10 +190,11 @@ class AgentEngine @Inject constructor(
         // 构建用户消息（多模态 or 纯文本）
         if (imageBase64 != null) {
             val mime = imageMimeType ?: "image/jpeg"
+            val textContent = if (query.isBlank()) "请分析这张图片的内容并给出详细描述" else query
             messages.add(OpenAIMessage(
                 role = "user",
                 contentParts = listOf(
-                    ContentPart(type = "text", text = query),
+                    ContentPart(type = "text", text = textContent),
                     ContentPart(type = "image_url", image_url = ImageUrl(url = "data:$mime;base64,$imageBase64"))
                 )
             ))
@@ -288,18 +291,69 @@ class AgentEngine @Inject constructor(
                 return content
 
             } catch (e: Exception) {
-                if (e.message?.contains("429") == true || e.message?.contains("quota") == true) {
+                val errMsg = e.message ?: ""
+                // 余额不足(402)或限流(429)时，尝试回退到 Gemini 免费模型
+                if (errMsg.contains("402") || errMsg.contains("429") || errMsg.contains("quota") || errMsg.contains("insufficient") || errMsg.contains("balance")) {
+                    reportStatus("⚠️ DeepSeek 余额不足，切换到 Gemini 免费模型...")
+                    return callGemini(query, imageBase64, imageMimeType)
+                }
+                if (errMsg.contains("429")) {
                     delay(3000L)
                     if (cycleCount >= MAX_REACT_CYCLES) {
                         return "[请求限流，请稍后重试]"
                     }
                     continue
                 }
-                return "[引擎异常] ${e.message?.take(100) ?: "未知错误"}"
+                return "[引擎异常] ${errMsg.take(100) ?: "未知错误"}"
             }
         }
 
         return lastAssistantText.ifBlank { "[已达到最大推理轮次(${MAX_REACT_CYCLES})，结果可能不完整]" }
+    }
+
+    /**
+     * 获取 Gemini API Key
+     */
+    private fun getGeminiApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.GEMINI_API_KEY else savedKey
+    }
+
+    /**
+     * 调用 Gemini 免费模型作为备用
+     */
+    private suspend fun callGemini(query: String, imageBase64: String?, imageMimeType: String?): String {
+        val apiKey = getGeminiApiKey()
+
+        try {
+            val parts = mutableListOf<GeminiPart>()
+
+            // 添加文本
+            val textContent = if (query.isBlank()) "请分析这张图片的内容并给出详细描述" else query
+            parts.add(GeminiPart(text = textContent))
+
+            // 添加图片（如果有）
+            if (imageBase64 != null) {
+                val mime = imageMimeType ?: "image/jpeg"
+                parts.add(GeminiPart(inlineData = GeminiInlineData(mime_type = mime, data = imageBase64)))
+            }
+
+            val request = GeminiRequest(
+                contents = listOf(GeminiContent(parts = parts))
+            )
+
+            val response = geminiService.generateContent(apiKey, request)
+
+            if (response.error != null) {
+                return "[Gemini 错误] ${response.error.message ?: "未知错误"}"
+            }
+
+            val candidate = response.candidates?.firstOrNull()
+            val content = candidate?.content?.parts?.firstOrNull { it.text != null }?.text
+            return content ?: "[Gemini 返回为空]"
+        } catch (e: Exception) {
+            return "[Gemini 调用失败] ${e.message?.take(100) ?: "未知错误"}"
+        }
     }
 
     /**
@@ -492,7 +546,7 @@ ${results.joinToString("\n")}
         return simplePatterns.any { query.contains(it, ignoreCase = true) }
     }
 
-    private fun buildSystemPrompt(memoryPrompt: String, currentModel: String, webSearchEnabled: Boolean, hasImage: Boolean): String {
+    private suspend fun buildSystemPrompt(memoryPrompt: String, currentModel: String, webSearchEnabled: Boolean, hasImage: Boolean): String {
         val enabledTools = toolRegistry.getAll().map { "${it.name}: ${it.description}" }
         val sb = StringBuilder()
 
@@ -502,7 +556,7 @@ ${results.joinToString("\n")}
         sb.appendLine()
 
         // 注入学习到的用户偏好
-        val prefs = kotlinx.coroutines.runBlocking { preferenceLearner.getLearnedPreferences() }
+        val prefs = preferenceLearner.getLearnedPreferences()
         if (prefs.isNotEmpty()) {
             sb.appendLine("[学习到的用户偏好 - 请据此调整回复风格]")
             prefs.forEach { (key, value) ->

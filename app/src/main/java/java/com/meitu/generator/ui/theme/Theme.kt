@@ -14,16 +14,20 @@ data class AppColors(
     val surface: Color,
     val textPrimary: Color,
     val textSecondary: Color,
+    val textTertiary: Color,
     val border: Color,
     val accent: Color,
     val accentDisabled: Color,
     val messageUserBg: Color,
     val messageAiBg: Color,
     val messageAiText: Color,
+    val messageUserText: Color,
     val systemBg: Color,
     val error: Color,
     val success: Color,
-    val warning: Color
+    val warning: Color,
+    val online: Color,
+    val accentAlpha12: Color
 )
 
 val LightAppColors = AppColors(
@@ -31,16 +35,20 @@ val LightAppColors = AppColors(
     surface = LightColors.Surface,
     textPrimary = LightColors.TextPrimary,
     textSecondary = LightColors.TextSecondary,
+    textTertiary = LightColors.TextTertiary,
     border = LightColors.Border,
     accent = LightColors.Accent,
     accentDisabled = LightColors.AccentDisabled,
     messageUserBg = LightColors.MessageUserBg,
     messageAiBg = LightColors.MessageAiBg,
     messageAiText = LightColors.MessageAiText,
+    messageUserText = LightColors.MessageUserText,
     systemBg = LightColors.SystemBg,
     error = LightColors.Error,
     success = LightColors.Success,
-    warning = LightColors.Warning
+    warning = LightColors.Warning,
+    online = LightColors.Online,
+    accentAlpha12 = LightColors.AccentAlpha12
 )
 
 val DarkAppColors = AppColors(
@@ -48,16 +56,20 @@ val DarkAppColors = AppColors(
     surface = DarkColors.Surface,
     textPrimary = DarkColors.TextPrimary,
     textSecondary = DarkColors.TextSecondary,
+    textTertiary = DarkColors.TextTertiary,
     border = DarkColors.Border,
     accent = DarkColors.Accent,
     accentDisabled = DarkColors.AccentDisabled,
     messageUserBg = DarkColors.MessageUserBg,
     messageAiBg = DarkColors.MessageAiBg,
     messageAiText = DarkColors.MessageAiText,
+    messageUserText = DarkColors.MessageUserText,
     systemBg = DarkColors.SystemBg,
     error = DarkColors.Error,
     success = DarkColors.Success,
-    warning = DarkColors.Warning
+    warning = DarkColors.Warning,
+    online = DarkColors.Online,
+    accentAlpha12 = DarkColors.AccentAlpha12
 )
 
 // ============ CompositionLocal 提供自定义配色 ============

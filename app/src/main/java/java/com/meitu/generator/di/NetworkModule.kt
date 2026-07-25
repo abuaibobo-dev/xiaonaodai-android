@@ -148,4 +148,22 @@ object NetworkModule {
     fun provideDeepSeekBalanceService(@Named("deepseek") retrofit: Retrofit): DeepSeekBalanceService {
         return retrofit.create(DeepSeekBalanceService::class.java)
     }
+
+    // ============ Google Gemini API ============
+    @Provides
+    @Singleton
+    @Named("gemini")
+    fun provideGeminiRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(com.meitu.generator.util.Constants.GEMINI_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGeminiService(@Named("gemini") retrofit: Retrofit): com.meitu.generator.data.remote.GeminiService {
+        return retrofit.create(com.meitu.generator.data.remote.GeminiService::class.java)
+    }
 }
