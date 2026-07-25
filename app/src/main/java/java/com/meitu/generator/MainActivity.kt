@@ -187,6 +187,8 @@ private fun TopAppBar(
                         ).let { if (it > 0) androidx.compose.ui.platform.LocalContext.current.resources.getDimensionPixelSize(it).toDp() else 0.dp }
                     })
             )
+            // 额外间距，让顶栏内容整体下移
+            Spacer(modifier = Modifier.fillMaxWidth().height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
