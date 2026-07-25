@@ -388,6 +388,7 @@ private fun SidebarDrawer(
     onDismiss: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val balance by viewModel.balance.collectAsState()
 
     LaunchedEffect(Unit) {

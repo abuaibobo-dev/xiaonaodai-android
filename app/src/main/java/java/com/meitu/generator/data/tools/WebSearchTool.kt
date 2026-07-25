@@ -64,7 +64,8 @@ class WebSearchTool @Inject constructor() : Tool {
 
         for (i in titles.indices) {
             if (i >= 8) break
-            val title = titles[i].ifBlank { continue }
+            val title = titles[i]
+            if (title.isBlank()) continue
             val snippet = if (i < snippets.size) snippets[i] else ""
             results.add(title to snippet)
         }

@@ -82,7 +82,7 @@ fun SettingsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = Spacing.PagePadding, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.SmallSpacing)
+            verticalArrangement = Arrangement.spacedBy(Spacing.ElementSpacing)
         ) {
             // ============ AI模型配置 ============
             item { SectionTitle("AI 模型配置") }
