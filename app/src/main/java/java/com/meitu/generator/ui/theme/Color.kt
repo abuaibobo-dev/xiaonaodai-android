@@ -26,7 +26,7 @@ object LightColors {
 
 // ============ 暗色模式配色 ============
 object DarkColors {
-    val Background = Color(0xFF000000)       // 纯黑
+    val Background = Color(0xFF0D0D0D)       // 深灰背景
     val Surface = Color(0xFF1A1A1A)          // 卡片/表面
     val TextPrimary = Color(0xFFFFFFFF)      // 文字主色
     val TextSecondary = Color(0xFF999999)    // 文字次要

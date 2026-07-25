@@ -452,7 +452,7 @@ private fun SmartInputBar(
                                         Text("🤖", fontSize = 11.sp)
                                         Spacer(Modifier.width(4.dp))
                                         Text(
-                                            currentModel.replace("deepseek-", "DS ").replace("-v4", "v4"),
+                                            com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(currentModel),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = colors.textSecondary,
@@ -471,7 +471,7 @@ private fun SmartInputBar(
                                     onClick = onToggleDeepThinking
                                 )
                                 SmartModeChip(
-                                    icon = "🔍",
+                                    icon = "🌐",
                                     label = "搜索",
                                     active = webSearch,
                                     activeColor = Color(0xFF00B894),
@@ -534,7 +534,7 @@ private fun SmartInputBar(
                         DropdownMenuItem(
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(model, fontSize = 14.sp, color = colors.textPrimary)
+                                    Text(com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(model), fontSize = 14.sp, color = colors.textPrimary)
                                     if (model == currentModel) {
                                         Spacer(Modifier.width(8.dp))
                                         Text("✓", fontSize = 14.sp, color = colors.accent, fontWeight = FontWeight.Bold)

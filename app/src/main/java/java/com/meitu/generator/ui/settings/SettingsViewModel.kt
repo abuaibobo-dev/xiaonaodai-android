@@ -45,6 +45,7 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refreshBalance()
+        refreshAllApiKeys()
     }
 
     fun refreshBalance() {
@@ -83,37 +84,41 @@ class SettingsViewModel @Inject constructor(
         emit(saved.ifBlank { Constants.DEFAULT_GITHUB_TOKEN })
     }.stateIn(viewModelScope, SharingStarted.Lazily, Constants.DEFAULT_GITHUB_TOKEN)
 
-    val aiApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    // ============ API Keys（MutableStateFlow，保存后同步更新UI） ============
+    private val _aiApiKey = MutableStateFlow("")
+    val aiApiKey: StateFlow<String> = _aiApiKey.asStateFlow()
 
-    val geminiApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _geminiApiKey = MutableStateFlow("")
+    val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
 
-    val groqApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _groqApiKey = MutableStateFlow("")
+    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
 
-    val sambanovaApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _sambanovaApiKey = MutableStateFlow("")
+    val sambanovaApiKey: StateFlow<String> = _sambanovaApiKey.asStateFlow()
 
-    val hfApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_HF_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _hfApiKey = MutableStateFlow("")
+    val hfApiKey: StateFlow<String> = _hfApiKey.asStateFlow()
 
-    val openrouterApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _openrouterApiKey = MutableStateFlow("")
+    val openrouterApiKey: StateFlow<String> = _openrouterApiKey.asStateFlow()
 
-    val cerebrasApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_CEREBRAS_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _cerebrasApiKey = MutableStateFlow("")
+    val cerebrasApiKey: StateFlow<String> = _cerebrasApiKey.asStateFlow()
 
-    val nvidiaApiKey: StateFlow<String> = flow {
-        emit(securePrefs.getString(Constants.KEY_NVIDIA_API_KEY, "") ?: "")
-    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+    private val _nvidiaApiKey = MutableStateFlow("")
+    val nvidiaApiKey: StateFlow<String> = _nvidiaApiKey.asStateFlow()
+
+    private fun refreshAllApiKeys() {
+        _aiApiKey.value = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
+        _geminiApiKey.value = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "") ?: ""
+        _groqApiKey.value = securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: ""
+        _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
+        _hfApiKey.value = securePrefs.getString(Constants.KEY_HF_API_KEY, "") ?: ""
+        _openrouterApiKey.value = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
+        _cerebrasApiKey.value = securePrefs.getString(Constants.KEY_CEREBRAS_API_KEY, "") ?: ""
+        _nvidiaApiKey.value = securePrefs.getString(Constants.KEY_NVIDIA_API_KEY, "") ?: ""
+    }
 
     private val _showClearConfirm = MutableStateFlow(false)
     val showClearConfirm: StateFlow<Boolean> = _showClearConfirm.asStateFlow()
@@ -135,42 +140,51 @@ class SettingsViewModel @Inject constructor(
 
     fun saveApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_AI_API_KEY, key).apply()
-        _toastMessage.value = "API Key 已保存"
+        _aiApiKey.value = key
+        _toastMessage.value = "✅ DeepSeek API Key 已保存"
+        refreshBalance()
     }
 
     fun saveGeminiApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_GEMINI_API_KEY, key).apply()
-        _toastMessage.value = "Google API Key 已保存"
+        _geminiApiKey.value = key
+        _toastMessage.value = "✅ Google API Key 已保存"
     }
 
     fun saveGroqApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_GROQ_API_KEY, key).apply()
-        _toastMessage.value = "Groq API Key 已保存"
+        _groqApiKey.value = key
+        _toastMessage.value = "✅ Groq API Key 已保存"
     }
 
     fun saveSambaNovaApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_SAMBANOVA_API_KEY, key).apply()
-        _toastMessage.value = "SambaNova API Key 已保存"
+        _sambanovaApiKey.value = key
+        _toastMessage.value = "✅ SambaNova API Key 已保存"
     }
 
     fun saveHfApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_HF_API_KEY, key).apply()
-        _toastMessage.value = "HuggingFace API Key 已保存"
+        _hfApiKey.value = key
+        _toastMessage.value = "✅ HuggingFace API Key 已保存"
     }
 
     fun saveOpenRouterApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_OPENROUTER_API_KEY, key).apply()
-        _toastMessage.value = "OpenRouter API Key 已保存"
+        _openrouterApiKey.value = key
+        _toastMessage.value = "✅ OpenRouter API Key 已保存"
     }
 
     fun saveCerebrasApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_CEREBRAS_API_KEY, key).apply()
-        _toastMessage.value = "Cerebras API Key 已保存"
+        _cerebrasApiKey.value = key
+        _toastMessage.value = "✅ Cerebras API Key 已保存"
     }
 
     fun saveNvidiaApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_NVIDIA_API_KEY, key).apply()
-        _toastMessage.value = "NVIDIA API Key 已保存"
+        _nvidiaApiKey.value = key
+        _toastMessage.value = "✅ NVIDIA API Key 已保存"
     }
 
     fun clearCache() {
@@ -192,6 +206,7 @@ class SettingsViewModel @Inject constructor(
             settingsRepo.initDefaults()
             _showClearConfirm.value = false
             _toastMessage.value = "所有数据已清空"
+            refreshAllApiKeys()
         }
     }
 

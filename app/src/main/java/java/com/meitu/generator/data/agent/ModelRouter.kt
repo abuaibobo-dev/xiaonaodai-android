@@ -17,12 +17,12 @@ object ModelRouter {
         
         // 1. 图片分析任务 → Gemini（多模态最强）
         if (hasImage) {
-            return "gemini-2.5-flash"
+            return "gemini-3.5-flash"
         }
         
         // 2. 深度推理/数学/逻辑分析 → DeepSeek R1 Distill (Groq)
         if (isReasoningTask(lowerQuery) || deepThinking) {
-            return "deepseek-r1-distill-70b"
+            return "deepseek-r1-distill-llama-70b"
         }
         
         // 3. 写代码/编程任务 → DeepSeek-V3.1 (SambaNova)
@@ -35,9 +35,9 @@ object ModelRouter {
             return "moonshotai/kimi-k2-instruct"
         }
         
-        // 5. 长文本处理（>2000字） → Gemini 2.5 Flash 1M上下文
+        // 5. 长文本处理（>2000字） → Gemini 3.5 Flash 1M上下文
         if (query.length > 2000) {
-            return "gemini-2.5-flash"
+            return "gemini-3.5-flash"
         }
         
         // 6. 快速简单问答 → GPT-OSS 20B (Groq 最快)
@@ -127,16 +127,16 @@ object ModelRouter {
      */
     fun getModelDisplayName(modelId: String): String {
         return when (modelId) {
+            "auto" -> "自动模式"
             "deepseek-v4-flash" -> "DeepSeek V4 Flash"
             "deepseek-v4-pro" -> "DeepSeek V4 Pro"
-            "gemini-2.0-flash" -> "Gemini 2.0 Flash"
+            "gemini-3.5-flash" -> "Gemini 3.5 Flash"
+            "gemini-3.1-flash-lite" -> "Gemini 3.1 Flash-Lite"
             "gemini-2.5-flash" -> "Gemini 2.5 Flash"
             "gemini-2.5-flash-lite" -> "Gemini 2.5 Flash-Lite"
             "openai/gpt-oss-120b" -> "GPT-OSS 120B"
             "openai/gpt-oss-20b" -> "GPT-OSS 20B"
-            "llama-3.3-70b-versatile" -> "Llama 3.3 70B"
-            "llama-3.1-8b-instant" -> "Llama 3.1 8B"
-            "deepseek-r1-distill-70b" -> "DeepSeek R1 Distill"
+            "deepseek-r1-distill-llama-70b" -> "DeepSeek R1 Distill"
             "moonshotai/kimi-k2-instruct" -> "Kimi K2"
             "Meta-Llama-3.3-70B-Instruct" -> "Llama 3.3 70B (SN)"
             "gpt-oss-120b" -> "GPT-OSS 120B (SN)"

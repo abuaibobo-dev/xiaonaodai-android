@@ -61,6 +61,7 @@ class DeveloperTool @Inject constructor(
         val codeContext = arguments["context"] as? String ?: ""
 
         val model = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
+        val effectiveModel = if (model == "auto" || model.isBlank()) "deepseek-v4-flash" else model
 
         val prompt = buildString {
             appendLine("你是一个 Android 开发专家。请根据需求生成完整的 Kotlin 代码文件。")
@@ -85,7 +86,7 @@ class DeveloperTool @Inject constructor(
 
         try {
             val request = OpenAIRequest(
-                model = model,
+                model = effectiveModel,
                 messages = listOf(OpenAIMessage(role = "user", content = prompt)),
                 temperature = 0.3,
                 max_tokens = 4000

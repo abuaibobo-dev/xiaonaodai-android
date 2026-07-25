@@ -26,16 +26,12 @@ import com.meitu.generator.ui.theme.*
 import com.meitu.generator.ui.components.Spacing
 import com.meitu.generator.ui.components.CornerRadius
 import com.meitu.generator.util.Constants
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val colors = LocalAppColors.current
-    val currentModel by viewModel.currentBrainModel.collectAsState()
     val githubToken by viewModel.githubToken.collectAsState()
     val aiApiKey by viewModel.aiApiKey.collectAsState()
     val geminiApiKey by viewModel.geminiApiKey.collectAsState()
@@ -49,7 +45,6 @@ fun SettingsScreen(
     val toastMessage by viewModel.toastMessage.collectAsState()
     val privacyEnabled by viewModel.privacyModeEnabled.collectAsState()
 
-    var showModelDialog by remember { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
@@ -78,17 +73,14 @@ fun SettingsScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
+    Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = Spacing.PagePadding, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(Spacing.ElementSpacing)
         ) {
-            // ============ AI模型配置 ============
-            item { SectionTitle("AI 模型配置") }
-            item {
-                SettingRow("AI 模型", currentModel, onClick = { showModelDialog = true })
-            }
+            // ============ API Key 配置 ============
+            item { SectionTitle("API Key 配置") }
             item {
                 Column(
                     modifier = Modifier
@@ -198,68 +190,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ============ 用量查询 ============
-            item { SectionTitle("用量查询") }
-            item {
-                val balance by viewModel.balance.collectAsState()
-                val balanceLoading by viewModel.balanceLoading.collectAsState()
-                val context = LocalContext.current
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("DeepSeek API 余额", fontSize = 15.sp, color = colors.textPrimary)
-                        if (balanceLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = colors.accent,
-                                strokeWidth = 2.dp
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        BalanceItem("已充值", "¥${balance.toppedUp}", colors.textPrimary)
-                        BalanceItem("已使用", "¥${balance.used}", colors.error)
-                        BalanceItem("剩余", "¥${balance.totalBalance}", colors.success)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(CornerRadius.Button))
-                            .background(colors.accent.copy(alpha = 0.1f))
-                            .clickable {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://platform.deepseek.com/usage"))
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            }
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("🌐", fontSize = 14.sp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("一键直达官网查询用量", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.accent)
-                    }
-                }
-            }
-
             // ============ 隐私与安全 ============
             item { SectionTitle("隐私与安全") }
             item {
@@ -346,61 +276,30 @@ fun SettingsScreen(
                 }
             }
 
-            // Toast message
-            if (toastMessage != null) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(CornerRadius.Button))
-                            .background(colors.accent.copy(alpha = 0.15f))
-                            .padding(12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(toastMessage ?: "", fontSize = 15.sp, color = colors.accent)
-                    }
-                }
-            }
-
             item { Spacer(Modifier.height(80.dp)) }
         }
-    }
 
-    // Model selection dialog
-    if (showModelDialog) {
-        AlertDialog(
-            onDismissRequest = { showModelDialog = false },
-            containerColor = colors.surface,
-            title = { Text("选择 AI 模型", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Constants.AVAILABLE_MODELS.forEach { model ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(CornerRadius.Input))
-                                .clickable {
-                                    viewModel.setBrainModel(model)
-                                    showModelDialog = false
-                                }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(model, fontSize = 15.sp, color = colors.textPrimary)
-                            if (model == currentModel) {
-                                Text("✓", fontSize = 16.sp, color = colors.accent, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+        // Toast overlay at top
+        if (toastMessage != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = Spacing.PagePadding, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.Button))
+                        .background(colors.success.copy(alpha = 0.9f))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(toastMessage ?: "", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Medium)
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { showModelDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
-                ) { Text("关闭") }
             }
-        )
+        }
     }
 
     // Token edit dialog
@@ -767,16 +666,6 @@ fun SettingRow(title: String, value: String, color: Color = Color.Unspecified, o
             }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-    }
-}
-
-@Composable
-private fun BalanceItem(label: String, value: String, valueColor: Color) {
-    val colors = LocalAppColors.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = valueColor)
-        Spacer(Modifier.height(2.dp))
-        Text(label, fontSize = 12.sp, color = colors.textTertiary)
     }
 }
 

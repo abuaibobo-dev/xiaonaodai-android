@@ -50,10 +50,11 @@ $historyText
 只输出摘要文本，不要解释。"""
 
             val model = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
+            val effectiveModel = if (model == "auto" || model.isBlank()) "deepseek-v4-flash" else model
             val apiKey = (securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "").ifBlank { Constants.OPENAI_API_KEY }
 
             val request = OpenAIRequest(
-                model = model,
+                model = effectiveModel,
                 messages = listOf(
                     OpenAIMessage(role = "system", content = "你是记忆压缩助手，将对话历史压缩为简洁偏好摘要。"),
                     OpenAIMessage(role = "user", content = prompt)

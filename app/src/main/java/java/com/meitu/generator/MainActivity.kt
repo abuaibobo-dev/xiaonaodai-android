@@ -105,7 +105,6 @@ fun MainScreen() {
                 onClearChat = {
                     scope.launch { AppEvents.send("clear_chat") }
                 },
-                viewModel = assistantViewModel
             )
 
             // ============ 页面内容 ============
@@ -160,40 +159,22 @@ private fun TopAppBar(
     currentRoute: String?,
     onMenuClick: () -> Unit,
     onNewChat: () -> Unit,
-    onClearChat: () -> Unit,
-    viewModel: AssistantViewModel
+    onClearChat: () -> Unit
 ) {
     val colors = LocalAppColors.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
-    val currentModel by viewModel.brainModel.collectAsState()
-
-    // 模型显示名称（统一映射）
-    val modelDisplayName = com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(currentModel)
-
     Surface(
         color = colors.background,
         shadowElevation = 0.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().statusBarsPadding()
     ) {
         Column {
-            // 状态栏占位
-            Spacer(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(androidx.compose.ui.platform.LocalDensity.current.run {
-                        androidx.compose.ui.platform.LocalContext.current.resources.getIdentifier(
-                            "status_bar_height", "dim", "android"
-                        ).let { if (it > 0) androidx.compose.ui.platform.LocalContext.current.resources.getDimensionPixelSize(it).toDp() else 0.dp }
-                    })
-            )
-            // 额外间距，让顶栏内容整体下移
-            Spacer(modifier = Modifier.fillMaxWidth().height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
-                    .padding(horizontal = 8.dp),
+                    .height(48.dp)
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧：汉堡菜单按钮（设置页隐藏）
@@ -239,25 +220,14 @@ private fun TopAppBar(
                     }
                 }
 
-                // 标题 + 当前模型
-                Column(
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        "布老师",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary,
-                        lineHeight = 20.sp
-                    )
-                    Text(
-                        modelDisplayName,
-                        fontSize = 11.sp,
-                        color = colors.textTertiary,
-                        lineHeight = 14.sp
-                    )
-                }
+                // 标题
+                Text(
+                    "布老师",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
+                )
 
                 // 右侧：状态指示点 + 更多菜单（仅对话页显示）
                 Box(

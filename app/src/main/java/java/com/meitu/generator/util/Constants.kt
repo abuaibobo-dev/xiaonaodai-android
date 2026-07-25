@@ -4,18 +4,18 @@ object Constants {
     // ============ AI 大脑 - DeepSeek API ============
     const val OPENAI_BASE_URL = "https://api.deepseek.com/v1/"
     val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,49,100,53,101,55,55,51,50,98,51,102,54,52,101,50,55,98,102,98,98,56,57,54,100,53,55,98,102,101,101,50,98))
-    const val OPENAI_MODEL = "deepseek-v4-flash"
+    const val OPENAI_MODEL = "auto"
 
     // ============ Google Gemini API ============
     const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/"
     val GEMINI_API_KEY: String get() = String(byteArrayOf(65,81,46,65,98,56,82,78,54,76,88,116,70,50,75,121,110,80,86,70,76,48,86,54,80,122,76,71,74,112,105,113,113,119,120,97,97,98,118,118,109,103,121,54,79,115,52,49,49,71,98,80,81))
-    const val GEMINI_MODEL = "gemini-2.0-flash"
+    const val GEMINI_MODEL = "gemini-3.5-flash"
     const val KEY_GEMINI_API_KEY = "gemini_api_key"
 
     // ============ Groq API ============
     const val GROQ_BASE_URL = "https://api.groq.com/openai/v1/"
     val GROQ_API_KEY: String get() = String(byteArrayOf(103,115,107,95,110,54,70,86,110,56,49,87,102,55,65,67,108,115,51,80,67,107,48,87,87,71,100,121,98,51,70,89,82,78,78,52,56,103,71,82,52,115,112,73,78,51,53,105,108,81,114,105,54,104,52,66))
-    const val GROQ_MODEL = "llama-3.3-70b-versatile"
+    const val GROQ_MODEL = "openai/gpt-oss-120b"
     const val KEY_GROQ_API_KEY = "groq_api_key"
 
     // ============ SambaNova API ============
@@ -49,19 +49,20 @@ object Constants {
     const val KEY_NVIDIA_API_KEY = "nvidia_api_key"
 
     val AVAILABLE_MODELS = listOf(
+        // 自动模式（智能路由）
+        "auto",
         // DeepSeek（主力）
         "deepseek-v4-flash",
         "deepseek-v4-pro",
         // Google Gemini（免费备用）
-        "gemini-2.0-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
         // Groq（免费备用）
         "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "deepseek-r1-distill-70b",
+        "deepseek-r1-distill-llama-70b",
         "moonshotai/kimi-k2-instruct",
         // SambaNova（免费备用）
         "Meta-Llama-3.3-70B-Instruct",

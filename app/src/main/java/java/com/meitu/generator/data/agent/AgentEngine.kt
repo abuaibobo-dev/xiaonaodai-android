@@ -57,15 +57,15 @@ class AgentEngine @Inject constructor(
         /** 模型名 → 所属平台映射（仅保留当前可用模型） */
         private val GROQ_MODELS = setOf(
             "openai/gpt-oss-120b", "openai/gpt-oss-20b",
-            "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
-            "deepseek-r1-distill-70b", "moonshotai/kimi-k2-instruct"
+            "deepseek-r1-distill-llama-70b", "moonshotai/kimi-k2-instruct"
         )
         private val SAMBANOVA_MODELS = setOf(
             "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b",
             "DeepSeek-V3.1", "gemma-4-31B-it"
         )
         private val GEMINI_MODELS = setOf(
-            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"
+            "gemini-3.5-flash", "gemini-3.1-flash-lite",
+            "gemini-2.5-flash", "gemini-2.5-flash-lite"
         )
         private val HF_MODELS = setOf("meta-llama/Llama-3.3-70B-Instruct")
 
@@ -196,9 +196,9 @@ class AgentEngine @Inject constructor(
      * 智能模型路由 - 根据任务类型自动选择最合适的免费模型
      */
     private suspend fun resolveModel(query: String, imageBase64: String?, deepThinkingEnabled: Boolean): String {
-        // 用户手动指定了模型 → 尊重用户选择
+        // 用户手动指定了模型 → 尊重用户选择（"auto" 表示自动路由）
         val userSelectedModel = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
-        if (userSelectedModel != Constants.OPENAI_MODEL) {
+        if (userSelectedModel != Constants.OPENAI_MODEL && userSelectedModel != "auto") {
             return userSelectedModel
         }
         // 使用智能路由器自动选择
@@ -212,7 +212,7 @@ class AgentEngine @Inject constructor(
         query: String,
         imageBase64: String? = null,
         imageMimeType: String? = null,
-        model: String = Constants.OPENAI_MODEL,
+        model: String = "deepseek-v4-flash",
         webSearchEnabled: Boolean = false,
         hasImage: Boolean = false
     ): String {
@@ -647,8 +647,10 @@ class AgentEngine @Inject constructor(
 
 输出null如果一步即可完成。只输出JSON，不要解释。"""
 
+            val planModel = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
+            val effectivePlanModel = if (planModel == "auto" || planModel.isBlank()) "deepseek-v4-flash" else planModel
             val request = OpenAIRequest(
-                model = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL),
+                model = effectivePlanModel,
                 messages = listOf(OpenAIMessage(role = "user", content = planPrompt)),
                 temperature = 0.3,
                 max_tokens = 500
