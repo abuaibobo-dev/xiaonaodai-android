@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.meitu.generator.app-mergeDebugResources-2:/values-v23/values-v23.xml",
+            "map": [
+                {
+                    "source": "/root/.gradle/caches/transforms-3/9c1596c9900eff10f81fdf9bdf6e91ee/transformed/work-runtime-2.9.0/res/values-v23/values-v23.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,121",
+                        "endColumns": "65,62",
+                        "endOffsets": "116,179"
+                    }
+                }
+            ]
+        }
+    ]
+}
