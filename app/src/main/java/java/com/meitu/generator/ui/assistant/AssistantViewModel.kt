@@ -67,7 +67,7 @@ class AssistantViewModel @Inject constructor(
     // ============ Chat Messages ============
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(ChatMessage(
-            text = "你好！我是小脑袋 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
+            text = "你好！我是布老师 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
             isUser = false
         ))
     )

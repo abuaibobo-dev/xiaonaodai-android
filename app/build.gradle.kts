@@ -13,8 +13,8 @@ android {
         applicationId = "com.meitu.generator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "4.5.2"
+        versionCode = 40
+        versionName = "4.6.0"
         multiDexEnabled = true
     }
 

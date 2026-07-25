@@ -91,6 +91,30 @@ class SettingsViewModel @Inject constructor(
         emit(securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "") ?: "")
     }.stateIn(viewModelScope, SharingStarted.Lazily, "")
 
+    val groqApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val sambanovaApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val hfApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_HF_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val openrouterApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val cerebrasApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_CEREBRAS_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val nvidiaApiKey: StateFlow<String> = flow {
+        emit(securePrefs.getString(Constants.KEY_NVIDIA_API_KEY, "") ?: "")
+    }.stateIn(viewModelScope, SharingStarted.Lazily, "")
+
     private val _showClearConfirm = MutableStateFlow(false)
     val showClearConfirm: StateFlow<Boolean> = _showClearConfirm.asStateFlow()
 
@@ -117,6 +141,36 @@ class SettingsViewModel @Inject constructor(
     fun saveGeminiApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_GEMINI_API_KEY, key).apply()
         _toastMessage.value = "Google API Key 已保存"
+    }
+
+    fun saveGroqApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_GROQ_API_KEY, key).apply()
+        _toastMessage.value = "Groq API Key 已保存"
+    }
+
+    fun saveSambaNovaApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_SAMBANOVA_API_KEY, key).apply()
+        _toastMessage.value = "SambaNova API Key 已保存"
+    }
+
+    fun saveHfApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_HF_API_KEY, key).apply()
+        _toastMessage.value = "HuggingFace API Key 已保存"
+    }
+
+    fun saveOpenRouterApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_OPENROUTER_API_KEY, key).apply()
+        _toastMessage.value = "OpenRouter API Key 已保存"
+    }
+
+    fun saveCerebrasApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_CEREBRAS_API_KEY, key).apply()
+        _toastMessage.value = "Cerebras API Key 已保存"
+    }
+
+    fun saveNvidiaApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_NVIDIA_API_KEY, key).apply()
+        _toastMessage.value = "NVIDIA API Key 已保存"
     }
 
     fun clearCache() {

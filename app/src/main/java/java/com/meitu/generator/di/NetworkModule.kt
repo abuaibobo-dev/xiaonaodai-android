@@ -166,4 +166,118 @@ object NetworkModule {
     fun provideGeminiService(@Named("gemini") retrofit: Retrofit): com.meitu.generator.data.remote.GeminiService {
         return retrofit.create(com.meitu.generator.data.remote.GeminiService::class.java)
     }
+
+    // ============ Groq API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("groq")
+    fun provideGroqRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.GROQ_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("groqService")
+    fun provideGroqService(@Named("groq") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ SambaNova API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("sambanova")
+    fun provideSambaNovaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.SAMBANOVA_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("sambanovaService")
+    fun provideSambaNovaService(@Named("sambanova") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ HuggingFace API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("hf")
+    fun provideHfRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.HF_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("hfService")
+    fun provideHfService(@Named("hf") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ OpenRouter API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("openrouter")
+    fun provideOpenRouterRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.OPENROUTER_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("openrouterService")
+    fun provideOpenRouterService(@Named("openrouter") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ Cerebras API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("cerebras")
+    fun provideCerebrasRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.CEREBRAS_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("cerebrasService")
+    fun provideCerebrasService(@Named("cerebras") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ NVIDIA NIM API (免费备用 - OpenAI 兼容) ============
+    @Provides
+    @Singleton
+    @Named("nvidia")
+    fun provideNvidiaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.NVIDIA_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("nvidiaService")
+    fun provideNvidiaService(@Named("nvidia") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
 }

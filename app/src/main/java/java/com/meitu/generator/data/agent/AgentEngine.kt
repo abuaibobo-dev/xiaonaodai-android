@@ -35,6 +35,12 @@ class AgentEngine @Inject constructor(
     private val agentMemory: AgentMemory,
     private val openAIService: OpenAIService,
     private val geminiService: GeminiService,
+    @Named("groqService") private val groqService: OpenAIService,
+    @Named("sambanovaService") private val sambanovaService: OpenAIService,
+    @Named("hfService") private val hfService: OpenAIService,
+    @Named("openrouterService") private val openrouterService: OpenAIService,
+    @Named("cerebrasService") private val cerebrasService: OpenAIService,
+    @Named("nvidiaService") private val nvidiaService: OpenAIService,
     private val planDao: PlanDao,
     private val semanticCache: SemanticCache,
     private val memoryCompressor: MemoryCompressor,
@@ -47,6 +53,40 @@ class AgentEngine @Inject constructor(
 ) {
     companion object {
         const val MAX_REACT_CYCLES = 5
+
+        /** 模型名 → 所属平台映射 */
+        private val GROQ_MODELS = setOf(
+            "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
+            "llama-4-scout-17b-16e-instruct", "qwen3-32b",
+            "deepseek-r1-distill-70b", "openai/gpt-oss-120b",
+            "moonshotai/kimi-k2-instruct"
+        )
+        private val SAMBANOVA_MODELS = setOf(
+            "Meta-Llama-3.1-405B-Instruct", "Meta-Llama-3.1-70B-Instruct",
+            "Meta-Llama-3.1-8B-Instruct", "Qwen2.5-72B-Instruct",
+            "Qwen2.5-Coder-32B-Instruct", "Meta-Llama-3.2-11B-Vision-Instruct",
+            "Meta-Llama-3.2-90B-Vision-Instruct", "DeepSeek-R1", "DeepSeek-V3-0324"
+        )
+        private val GEMINI_MODELS = setOf(
+            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+            "gemini-3-flash", "gemini-3.1-flash-lite"
+        )
+        private val HF_MODELS = setOf("meta-llama/Llama-3.3-70B-Instruct")
+
+        fun isGeminiModel(model: String): Boolean = GEMINI_MODELS.contains(model)
+
+        fun getModelPlatform(model: String): String = when {
+            GEMINI_MODELS.contains(model) -> "gemini"
+            GROQ_MODELS.contains(model) -> "groq"
+            SAMBANOVA_MODELS.contains(model) -> "sambanova"
+            HF_MODELS.contains(model) -> "hf"
+            model.startsWith("deepseek-") -> "deepseek"
+            model.startsWith("meta-llama/") -> "hf"
+            model.startsWith("meta/") -> "nvidia"
+            model.contains(":free") -> "openrouter"
+            model.startsWith("llama-3.3-70b") && !GROQ_MODELS.contains(model) -> "cerebras"
+            else -> "deepseek" // 默认走 DeepSeek
+        }
     }
 
     private val gson = Gson()
@@ -99,30 +139,36 @@ class AgentEngine @Inject constructor(
 
         val intent = IntentRouter.classify(query)
 
-        // 确定使用的模型
-        val effectiveModel = resolveModel(imageBase64, deepThinkingEnabled)
+        // 确定使用的模型 - 智能路由
         val hasImage = imageBase64 != null
+        val effectiveModel = resolveModel(query, imageBase64, deepThinkingEnabled)
+        // 显示智能路由选择原因
+        val selectionReason = ModelRouter.getSelectionReason(query, hasImage, deepThinkingEnabled)
+        reportStatus("🤖 ${ModelRouter.getModelDisplayName(effectiveModel)} | $selectionReason")
 
         val result = when (intent.type) {
-            IntentRouter.IntentType.CHAT -> {
-                reactLoop(query, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
-            }
             IntentRouter.IntentType.TASK_GENERATE -> {
                 generateAndBuild(query)
             }
-            IntentRouter.IntentType.TASK_MODIFY -> {
-                val plan = plan(query)
-                if (plan != null) {
-                    executeWithPlan(plan, query, imageBase64, imageMimeType)
+            else -> {
+                // Gemini 模型使用独立路径（非 OpenAI 兼容格式）
+                if (isGeminiModel(effectiveModel)) {
+                    val q = if (intent.type == IntentRouter.IntentType.TASK_BUILD) "[路由:cloud_build] $query" else query
+                    val plan = if (intent.type == IntentRouter.IntentType.TASK_MODIFY) plan(q) else null
+                    if (plan != null) {
+                        executeWithPlan(plan, q, imageBase64, imageMimeType)
+                    } else {
+                        callGemini(q, imageBase64, imageMimeType, effectiveModel)
+                    }
                 } else {
-                    reactLoop(query, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
+                    val q = if (intent.type == IntentRouter.IntentType.TASK_BUILD) "[路由:cloud_build] $query" else query
+                    val plan = if (intent.type == IntentRouter.IntentType.TASK_MODIFY) plan(q) else null
+                    if (plan != null) {
+                        executeWithPlan(plan, q, imageBase64, imageMimeType)
+                    } else {
+                        reactLoop(q, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
+                    }
                 }
-            }
-            IntentRouter.IntentType.TASK_BUILD -> {
-                reactLoop("[路由:cloud_build] $query", imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
-            }
-            IntentRouter.IntentType.QUERY -> {
-                reactLoop(query, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
             }
         }
 
@@ -155,19 +201,16 @@ class AgentEngine @Inject constructor(
     }
 
     /**
-     * 根据场景选择模型
+     * 智能模型路由 - 根据任务类型自动选择最合适的免费模型
      */
-    private suspend fun resolveModel(imageBase64: String?, deepThinkingEnabled: Boolean): String {
-        // 有图片 → 视觉模型
-        if (imageBase64 != null) {
-            return Constants.VISION_MODEL
+    private suspend fun resolveModel(query: String, imageBase64: String?, deepThinkingEnabled: Boolean): String {
+        // 用户手动指定了模型 → 尊重用户选择
+        val userSelectedModel = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
+        if (userSelectedModel != Constants.OPENAI_MODEL) {
+            return userSelectedModel
         }
-        // 深度思考 → R1
-        if (deepThinkingEnabled) {
-            return "deepseek-r1"
-        }
-        // 默认 → 用户选择的模型
-        return settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
+        // 使用智能路由器自动选择
+        return ModelRouter.selectModel(query, imageBase64 != null, deepThinkingEnabled)
     }
 
     /**
@@ -202,8 +245,8 @@ class AgentEngine @Inject constructor(
             messages.add(OpenAIMessage(role = "user", content = query))
         }
 
-        // 是否为推理模型（R1 系列不支持 temperature）
-        val isReasoningModel = model.startsWith("deepseek-r1")
+        // 是否为推理模型（仅 DeepSeek 平台 R1 系列不支持 temperature + 支持 thinking）
+        val isReasoningModel = model.startsWith("deepseek-r1") && getModelPlatform(model) == "deepseek"
         val temperature = if (isReasoningModel) null else 0.7
 
         // 深度思考配置
@@ -228,10 +271,16 @@ class AgentEngine @Inject constructor(
                     thinking = thinkingConfig
                 )
 
-                val response = openAIService.chatCompletions(
-                    request = request,
-                    authorization = "Bearer ${getApiKey()}"
-                )
+                // 根据模型名路由到正确的 service
+                val response = when (getModelPlatform(model)) {
+                    "groq" -> groqService.chatCompletions(request, "Bearer ${getGroqApiKey()}")
+                    "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
+                    "hf" -> hfService.chatCompletions(request, "Bearer ${getHfApiKey()}")
+                    "openrouter" -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
+                    "cerebras" -> cerebrasService.chatCompletions(request, "Bearer ${getCerebrasApiKey()}")
+                    "nvidia" -> nvidiaService.chatCompletions(request, "Bearer ${getNvidiaApiKey()}")
+                    else -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}") // deepseek 默认
+                }
 
                 TokenEstimator.account(request.toString(), response.toString())
 
@@ -292,10 +341,51 @@ class AgentEngine @Inject constructor(
 
             } catch (e: Exception) {
                 val errMsg = e.message ?: ""
-                // 余额不足(402)或限流(429)时，尝试回退到 Gemini 免费模型
+                // 余额不足(402)或限流(429)时，依次尝试免费备用模型
                 if (errMsg.contains("402") || errMsg.contains("429") || errMsg.contains("quota") || errMsg.contains("insufficient") || errMsg.contains("balance")) {
                     reportStatus("⚠️ DeepSeek 余额不足，切换到 Gemini 免费模型...")
-                    return callGemini(query, imageBase64, imageMimeType)
+                    val geminiResult = callGemini(query, imageBase64, imageMimeType)
+                    if (!(geminiResult.startsWith("[Gemini 错误]") || geminiResult.startsWith("[Gemini 调用失败]"))) {
+                        return geminiResult
+                    }
+                    reportStatus("⚠️ Gemini 也不可用，切换到 Groq 免费模型...")
+                    val groqResult = callGroq(query, imageBase64, imageMimeType)
+                    if (!(groqResult.startsWith("[Groq 错误]") || groqResult.startsWith("[Groq 调用失败]"))) {
+                        return groqResult
+                    }
+                    reportStatus("⚠️ Groq 也不可用，切换到 SambaNova 免费模型...")
+                    val sambanovaResult = callSambaNova(query, imageBase64, imageMimeType)
+                    if (!(sambanovaResult.startsWith("[SambaNova 错误]") || sambanovaResult.startsWith("[SambaNova 调用失败]"))) {
+                        return sambanovaResult
+                    }
+                    reportStatus("⚠️ SambaNova 也不可用，切换到 HuggingFace 免费模型...")
+                    val hfResult = callHuggingFace(query, imageBase64, imageMimeType)
+                    if (!(hfResult.startsWith("[HuggingFace 错误]") || hfResult.startsWith("[HuggingFace 调用失败]"))) {
+                        return hfResult
+                    }
+                    // 以下平台未配置 Key 时会自动跳过
+                    if (getOpenRouterApiKey().isNotBlank()) {
+                        reportStatus("⚠️ HuggingFace 也不可用，切换到 OpenRouter 免费模型...")
+                        val orResult = callOpenRouter(query, imageBase64, imageMimeType)
+                        if (!(orResult.startsWith("[OpenRouter 错误]") || orResult.startsWith("[OpenRouter 调用失败]"))) {
+                            return orResult
+                        }
+                    }
+                    if (getCerebrasApiKey().isNotBlank()) {
+                        reportStatus("⚠️ OpenRouter 也不可用，切换到 Cerebras 免费模型...")
+                        val cbResult = callCerebras(query, imageBase64, imageMimeType)
+                        if (!(cbResult.startsWith("[Cerebras 错误]") || cbResult.startsWith("[Cerebras 调用失败]"))) {
+                            return cbResult
+                        }
+                    }
+                    if (getNvidiaApiKey().isNotBlank()) {
+                        reportStatus("⚠️ Cerebras 也不可用，切换到 NVIDIA 免费模型...")
+                        val nvResult = callNvidia(query, imageBase64, imageMimeType)
+                        if (!(nvResult.startsWith("[NVIDIA 错误]") || nvResult.startsWith("[NVIDIA 调用失败]"))) {
+                            return nvResult
+                        }
+                    }
+                    return "[引擎异常] 所有备用模型均不可用，请检查 API Key 配置"
                 }
                 if (errMsg.contains("429")) {
                     delay(3000L)
@@ -320,9 +410,9 @@ class AgentEngine @Inject constructor(
     }
 
     /**
-     * 调用 Gemini 免费模型作为备用
+     * 调用 Gemini 模型（支持指定模型名）
      */
-    private suspend fun callGemini(query: String, imageBase64: String?, imageMimeType: String?): String {
+    private suspend fun callGemini(query: String, imageBase64: String?, imageMimeType: String?, model: String = Constants.GEMINI_MODEL): String {
         val apiKey = getGeminiApiKey()
 
         try {
@@ -342,7 +432,7 @@ class AgentEngine @Inject constructor(
                 contents = listOf(GeminiContent(parts = parts))
             )
 
-            val response = geminiService.generateContent(apiKey, request)
+            val response = geminiService.generateContent(model, apiKey, request)
 
             if (response.error != null) {
                 return "[Gemini 错误] ${response.error.message ?: "未知错误"}"
@@ -354,6 +444,172 @@ class AgentEngine @Inject constructor(
         } catch (e: Exception) {
             return "[Gemini 调用失败] ${e.message?.take(100) ?: "未知错误"}"
         }
+    }
+
+    /**
+     * 获取 Groq API Key
+     */
+    private fun getGroqApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_GROQ_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.GROQ_API_KEY else savedKey
+    }
+
+    /**
+     * 调用 Groq 免费模型作为第二备用
+     */
+    private suspend fun callGroq(query: String, imageBase64: String?, imageMimeType: String?): String {
+        val apiKey = getGroqApiKey()
+
+        try {
+            val messages = mutableListOf<OpenAIMessage>()
+            val memoryPrompt = agentMemory.buildMemoryPrompt()
+            messages.add(OpenAIMessage(role = "system", content = "你是「布老师」AI 智能体助手，请用中文回复用户。当前记忆：$memoryPrompt"))
+
+            // 构建用户消息（多模态 or 纯文本）
+            if (imageBase64 != null) {
+                val mime = imageMimeType ?: "image/jpeg"
+                val textContent = if (query.isBlank()) "请分析这张图片的内容并给出详细描述" else query
+                messages.add(OpenAIMessage(
+                    role = "user",
+                    contentParts = listOf(
+                        ContentPart(type = "text", text = textContent),
+                        ContentPart(type = "image_url", image_url = ImageUrl(url = "data:$mime;base64,$imageBase64"))
+                    )
+                ))
+            } else {
+                messages.add(OpenAIMessage(role = "user", content = query))
+            }
+
+            val request = OpenAIRequest(
+                model = Constants.GROQ_MODEL,
+                messages = messages,
+                temperature = 0.7,
+                max_tokens = 4096
+            )
+
+            val response = groqService.chatCompletions(
+                request = request,
+                authorization = "Bearer $apiKey"
+            )
+
+            if (response.error != null) {
+                return "[Groq 错误] ${response.error.message ?: "未知错误"}"
+            }
+
+            val choice = response.choices?.firstOrNull()
+            val content = choice?.message?.content
+            return content ?: "[Groq 返回为空]"
+        } catch (e: Exception) {
+            return "[Groq 调用失败] ${e.message?.take(100) ?: "未知错误"}"
+        }
+    }
+
+    /**
+     * 通用 OpenAI 兼容 API 调用（适用于 Groq/SambaNova/HuggingFace/OpenRouter/Cerebras/NVIDIA）
+     */
+    private suspend fun callOpenAICompatible(
+        service: OpenAIService,
+        apiKey: String,
+        model: String,
+        query: String,
+        imageBase64: String?,
+        imageMimeType: String?,
+        platformName: String
+    ): String {
+        if (apiKey.isBlank()) return "[$platformName 调用失败] 未配置 API Key"
+        try {
+            val messages = mutableListOf<OpenAIMessage>()
+            val memoryPrompt = agentMemory.buildMemoryPrompt()
+            messages.add(OpenAIMessage(role = "system", content = "你是「布老师」AI 智能体助手，请用中文回复用户。当前记忆：$memoryPrompt"))
+
+            if (imageBase64 != null) {
+                val mime = imageMimeType ?: "image/jpeg"
+                val textContent = if (query.isBlank()) "请分析这张图片的内容并给出详细描述" else query
+                messages.add(OpenAIMessage(
+                    role = "user",
+                    contentParts = listOf(
+                        ContentPart(type = "text", text = textContent),
+                        ContentPart(type = "image_url", image_url = ImageUrl(url = "data:$mime;base64,$imageBase64"))
+                    )
+                ))
+            } else {
+                messages.add(OpenAIMessage(role = "user", content = query))
+            }
+
+            val request = OpenAIRequest(
+                model = model,
+                messages = messages,
+                temperature = 0.7,
+                max_tokens = 4096
+            )
+
+            val response = service.chatCompletions(
+                request = request,
+                authorization = "Bearer $apiKey"
+            )
+
+            if (response.error != null) {
+                return "[$platformName 错误] ${response.error.message ?: "未知错误"}"
+            }
+
+            val choice = response.choices?.firstOrNull()
+            val content = choice?.message?.content
+            return content ?: "[$platformName 返回为空]"
+        } catch (e: Exception) {
+            return "[$platformName 调用失败] ${e.message?.take(100) ?: "未知错误"}"
+        }
+    }
+
+    /** 获取 SambaNova API Key */
+    private fun getSambaNovaApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.SAMBANOVA_API_KEY else savedKey
+    }
+
+    /** 调用 SambaNova 免费模型 */
+    private suspend fun callSambaNova(query: String, imageBase64: String?, imageMimeType: String?): String {
+        return callOpenAICompatible(sambanovaService, getSambaNovaApiKey(), Constants.SAMBANOVA_MODEL, query, imageBase64, imageMimeType, "SambaNova")
+    }
+
+    /** 获取 HuggingFace API Key */
+    private fun getHfApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_HF_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.HF_API_KEY else savedKey
+    }
+
+    /** 调用 HuggingFace 免费模型 */
+    private suspend fun callHuggingFace(query: String, imageBase64: String?, imageMimeType: String?): String {
+        return callOpenAICompatible(hfService, getHfApiKey(), Constants.HF_MODEL, query, imageBase64, imageMimeType, "HuggingFace")
+    }
+
+    /** 获取 OpenRouter API Key */
+    private fun getOpenRouterApiKey(): String {
+        return securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
+    }
+
+    /** 调用 OpenRouter 免费模型 */
+    private suspend fun callOpenRouter(query: String, imageBase64: String?, imageMimeType: String?): String {
+        return callOpenAICompatible(openrouterService, getOpenRouterApiKey(), Constants.OPENROUTER_MODEL, query, imageBase64, imageMimeType, "OpenRouter")
+    }
+
+    /** 获取 Cerebras API Key */
+    private fun getCerebrasApiKey(): String {
+        return securePrefs.getString(Constants.KEY_CEREBRAS_API_KEY, "") ?: ""
+    }
+
+    /** 调用 Cerebras 免费模型 */
+    private suspend fun callCerebras(query: String, imageBase64: String?, imageMimeType: String?): String {
+        return callOpenAICompatible(cerebrasService, getCerebrasApiKey(), Constants.CEREBRAS_MODEL, query, imageBase64, imageMimeType, "Cerebras")
+    }
+
+    /** 获取 NVIDIA API Key */
+    private fun getNvidiaApiKey(): String {
+        return securePrefs.getString(Constants.KEY_NVIDIA_API_KEY, "") ?: ""
+    }
+
+    /** 调用 NVIDIA NIM 免费模型 */
+    private suspend fun callNvidia(query: String, imageBase64: String?, imageMimeType: String?): String {
+        return callOpenAICompatible(nvidiaService, getNvidiaApiKey(), Constants.NVIDIA_MODEL, query, imageBase64, imageMimeType, "NVIDIA")
     }
 
     /**

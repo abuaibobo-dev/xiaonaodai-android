@@ -57,7 +57,7 @@ class CloudBuildTool @Inject constructor(
             })
             add("commitMessage", JsonObject().apply {
                 addProperty("type", "string")
-                addProperty("description", "Git 提交信息，默认为 'Auto build from 小脑袋 App'")
+                addProperty("description", "Git 提交信息，默认为 'Auto build from 布老师 App'")
             })
         })
         add("required", JsonArray().apply { add("projectCode") })
