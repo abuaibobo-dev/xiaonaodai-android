@@ -168,13 +168,8 @@ private fun TopAppBar(
     var showClearConfirm by remember { mutableStateOf(false) }
     val currentModel by viewModel.brainModel.collectAsState()
 
-    // 模型显示名称
-    val modelDisplayName = when (currentModel) {
-        "deepseek-v4-flash" -> "DeepSeek V4 Flash"
-        "deepseek-v4-pro" -> "DeepSeek V4 Pro"
-        "deepseek-r1" -> "DeepSeek R1"
-        else -> currentModel
-    }
+    // 模型显示名称（统一映射）
+    val modelDisplayName = com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(currentModel)
 
     Surface(
         color = colors.background,
@@ -195,8 +190,8 @@ private fun TopAppBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 12.dp),
+                    .height(44.dp)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧：汉堡菜单按钮（设置页隐藏）

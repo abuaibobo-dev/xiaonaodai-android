@@ -126,247 +126,74 @@ fun SettingsScreen(
                 }
             }
 
-            // ============ Google Gemini 配置（免费备用模型） ============
-            item { SectionTitle("Google Gemini（免费备用）") }
+            // ============ 备用模型 API Keys（可折叠） ============
             item {
+                var backupExpanded by remember { mutableStateOf(false) }
+                val configuredCount = listOf(geminiApiKey, groqApiKey, sambanovaApiKey, hfApiKey, openrouterApiKey, cerebrasApiKey, nvidiaApiKey).count { it.isNotBlank() }
+                
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(CornerRadius.Card))
                         .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
                 ) {
+                    // 折叠头部
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { backupExpanded = !backupExpanded }
+                            .padding(Spacing.CardSpacing),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Google API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费模型，DeepSeek 余额不足时自动切换", fontSize = 11.sp, color = colors.textTertiary)
-                        }
-                        IconButton(onClick = { geminiKeyInput = geminiApiKey; showGeminiKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "编辑 Google API Key",
-                                tint = colors.accent,
-                                modifier = Modifier.size(18.dp)
+                            Text("备用模型 API Keys", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            Text(
+                                if (configuredCount > 0) "已配置 $configuredCount/7 个平台" else "点击展开配置备用模型",
+                                fontSize = 11.sp,
+                                color = if (configuredCount > 0) colors.success else colors.textTertiary
                             )
                         }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (geminiApiKey.isNotBlank()) {
                         Text(
-                            "${geminiApiKey.take(8)}...${geminiApiKey.takeLast(4)}",
-                            fontSize = 13.sp,
-                            color = colors.success,
-                            fontFamily = FontFamily.Monospace
+                            if (backupExpanded) "\u25B4" else "\u25BE",
+                            fontSize = 14.sp,
+                            color = colors.textTertiary,
+                            modifier = Modifier.padding(start = 8.dp)
                         )
-                    } else {
-                        Text("未配置 - 点击编辑添加 Google API Key（从 aistudio.google.com 免费获取）", fontSize = 13.sp, color = colors.error)
                     }
-                }
-            }
-
-
-            // ============ Groq 配置（免费备用模型） ============
-            item { SectionTitle("Groq（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Groq API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费模型，Gemini 也不可用时自动切换", fontSize = 11.sp, color = colors.textTertiary)
+                    
+                    // 展开内容
+                    if (backupExpanded) {
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                        
+                        // Gemini
+                        BackupKeyRow("Google Gemini", geminiApiKey, "aistudio.google.com") {
+                            geminiKeyInput = geminiApiKey; showGeminiKeyDialog = true
                         }
-                        IconButton(onClick = { groqKeyInput = groqApiKey; showGroqKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "编辑 Groq API Key",
-                                tint = colors.accent,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        // Groq
+                        BackupKeyRow("Groq", groqApiKey, "console.groq.com") {
+                            groqKeyInput = groqApiKey; showGroqKeyDialog = true
                         }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (groqApiKey.isNotBlank()) {
-                        Text(
-                            "${groqApiKey.take(8)}...${groqApiKey.takeLast(4)}",
-                            fontSize = 13.sp,
-                            color = colors.success,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else {
-                        Text("未配置 - 点击编辑添加 Groq API Key（从 console.groq.com 免费获取）", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
-
-            // ============ SambaNova 配置（免费备用模型） ============
-            item { SectionTitle("SambaNova（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("SambaNova API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费模型 Llama 3.1 405B/Qwen2.5 等", fontSize = 11.sp, color = colors.textTertiary)
+                        // SambaNova
+                        BackupKeyRow("SambaNova", sambanovaApiKey, "sambanova.ai") {
+                            sambanovaKeyInput = sambanovaApiKey; showSambanovaKeyDialog = true
                         }
-                        IconButton(onClick = { sambanovaKeyInput = sambanovaApiKey; showSambanovaKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑 SambaNova API Key", tint = colors.accent, modifier = Modifier.size(18.dp))
+                        // HuggingFace
+                        BackupKeyRow("HuggingFace", hfApiKey, "huggingface.co") {
+                            hfKeyInput = hfApiKey; showHfKeyDialog = true
                         }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (sambanovaApiKey.isNotBlank()) {
-                        Text("${sambanovaApiKey.take(8)}...${sambanovaApiKey.takeLast(4)}", fontSize = 13.sp, color = colors.success, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text("未配置 - 点击编辑添加 SambaNova API Key（从 sambanova.ai 免费获取）", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
-
-            // ============ HuggingFace 配置（免费备用模型） ============
-            item { SectionTitle("HuggingFace（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("HuggingFace Token", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费额度 \$0.10/月，开源模型", fontSize = 11.sp, color = colors.textTertiary)
+                        // OpenRouter
+                        BackupKeyRow("OpenRouter", openrouterApiKey, "openrouter.ai") {
+                            openrouterKeyInput = openrouterApiKey; showOpenRouterKeyDialog = true
                         }
-                        IconButton(onClick = { hfKeyInput = hfApiKey; showHfKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑 HuggingFace Token", tint = colors.accent, modifier = Modifier.size(18.dp))
+                        // Cerebras
+                        BackupKeyRow("Cerebras", cerebrasApiKey, "cloud.cerebras.ai") {
+                            cerebrasKeyInput = cerebrasApiKey; showCerebrasKeyDialog = true
                         }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (hfApiKey.isNotBlank()) {
-                        Text("${hfApiKey.take(8)}...${hfApiKey.takeLast(4)}", fontSize = 13.sp, color = colors.success, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text("未配置 - 点击编辑添加 HuggingFace Token（从 huggingface.co 免费获取）", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
-
-            // ============ OpenRouter 配置（免费备用模型） ============
-            item { SectionTitle("OpenRouter（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("OpenRouter API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("聚合 43+ 免费模型，GitHub 登录即可", fontSize = 11.sp, color = colors.textTertiary)
+                        // NVIDIA
+                        BackupKeyRow("NVIDIA NIM", nvidiaApiKey, "build.nvidia.com") {
+                            nvidiaKeyInput = nvidiaApiKey; showNvidiaKeyDialog = true
                         }
-                        IconButton(onClick = { openrouterKeyInput = openrouterApiKey; showOpenRouterKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑 OpenRouter API Key", tint = colors.accent, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (openrouterApiKey.isNotBlank()) {
-                        Text("${openrouterApiKey.take(8)}...${openrouterApiKey.takeLast(4)}", fontSize = 13.sp, color = colors.success, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text("未配置 - 点击编辑添加 OpenRouter API Key（从 openrouter.ai 免费获取）", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
-
-            // ============ Cerebras 配置（免费备用模型） ============
-            item { SectionTitle("Cerebras（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Cerebras API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费 30 请求/分钟，极速推理", fontSize = 11.sp, color = colors.textTertiary)
-                        }
-                        IconButton(onClick = { cerebrasKeyInput = cerebrasApiKey; showCerebrasKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑 Cerebras API Key", tint = colors.accent, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (cerebrasApiKey.isNotBlank()) {
-                        Text("${cerebrasApiKey.take(8)}...${cerebrasApiKey.takeLast(4)}", fontSize = 13.sp, color = colors.success, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text("未配置 - 点击编辑添加 Cerebras API Key（从 cloud.cerebras.ai 免费获取）", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
-
-            // ============ NVIDIA NIM 配置（免费备用模型） ============
-            item { SectionTitle("NVIDIA NIM（免费备用）") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("NVIDIA API Key", fontSize = 15.sp, color = colors.textSecondary)
-                            Text("免费 40 请求/分钟，129+ 模型", fontSize = 11.sp, color = colors.textTertiary)
-                        }
-                        IconButton(onClick = { nvidiaKeyInput = nvidiaApiKey; showNvidiaKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑 NVIDIA API Key", tint = colors.accent, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (nvidiaApiKey.isNotBlank()) {
-                        Text("${nvidiaApiKey.take(8)}...${nvidiaApiKey.takeLast(4)}", fontSize = 13.sp, color = colors.success, fontFamily = FontFamily.Monospace)
-                    } else {
-                        Text("未配置 - 点击编辑添加 NVIDIA API Key（从 build.nvidia.com 免费获取）", fontSize = 13.sp, color = colors.error)
                     }
                 }
             }
@@ -963,4 +790,40 @@ fun SectionTitle(text: String) {
         letterSpacing = 1.sp,
         modifier = Modifier.padding(vertical = 8.dp)
     )
+}
+
+@Composable
+private fun BackupKeyRow(name: String, apiKey: String, sourceHint: String, onEdit: () -> Unit) {
+    val colors = LocalAppColors.current
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onEdit() }
+                .padding(horizontal = Spacing.CardSpacing, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, fontSize = 14.sp, color = colors.textPrimary)
+                if (apiKey.isNotBlank()) {
+                    Text(
+                        "${apiKey.take(6)}...${apiKey.takeLast(4)}",
+                        fontSize = 11.sp,
+                        color = colors.success,
+                        fontFamily = FontFamily.Monospace
+                    )
+                } else {
+                    Text("未配置 ($sourceHint 获取)", fontSize = 11.sp, color = colors.textTertiary)
+                }
+            }
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = "编辑",
+                tint = colors.accent,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+    }
 }

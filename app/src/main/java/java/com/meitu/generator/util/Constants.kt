@@ -21,7 +21,7 @@ object Constants {
     // ============ SambaNova API ============
     const val SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1/"
     val SAMBANOVA_API_KEY: String get() = String(byteArrayOf(51,49,99,54,53,49,55,102,45,97,55,54,49,45,52,56,52,101,45,98,55,102,51,45,55,100,56,50,57,56,101,100,50,98,55,49))
-    const val SAMBANOVA_MODEL = "Meta-Llama-3.1-70B-Instruct"
+    const val SAMBANOVA_MODEL = "Meta-Llama-3.3-70B-Instruct"
     const val KEY_SAMBANOVA_API_KEY = "sambanova_api_key"
 
     // ============ HuggingFace API ============
@@ -49,30 +49,26 @@ object Constants {
     const val KEY_NVIDIA_API_KEY = "nvidia_api_key"
 
     val AVAILABLE_MODELS = listOf(
+        // DeepSeek（主力）
         "deepseek-v4-flash",
         "deepseek-v4-pro",
-        "deepseek-r1",
+        // Google Gemini（免费备用）
         "gemini-2.0-flash",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
-        "gemini-3-flash",
-        "gemini-3.1-flash-lite",
+        // Groq（免费备用）
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "llama-4-scout-17b-16e-instruct",
-        "qwen3-32b",
         "deepseek-r1-distill-70b",
-        "openai/gpt-oss-120b",
         "moonshotai/kimi-k2-instruct",
-        "Meta-Llama-3.1-405B-Instruct",
-        "Meta-Llama-3.1-70B-Instruct",
-        "Meta-Llama-3.1-8B-Instruct",
-        "Qwen2.5-72B-Instruct",
-        "Qwen2.5-Coder-32B-Instruct",
-        "Meta-Llama-3.2-11B-Vision-Instruct",
-        "Meta-Llama-3.2-90B-Vision-Instruct",
-        "DeepSeek-R1",
-        "DeepSeek-V3-0324",
+        // SambaNova（免费备用）
+        "Meta-Llama-3.3-70B-Instruct",
+        "gpt-oss-120b",
+        "DeepSeek-V3.1",
+        "gemma-4-31B-it",
+        // HuggingFace（免费备用）
         "meta-llama/Llama-3.3-70B-Instruct"
     )
 

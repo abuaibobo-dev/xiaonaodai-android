@@ -20,34 +20,34 @@ object ModelRouter {
             return "gemini-2.5-flash"
         }
         
-        // 2. 深度推理/数学/逻辑分析 → DeepSeek R1 或 Groq DeepSeek-R1-Distill
+        // 2. 深度推理/数学/逻辑分析 → DeepSeek R1 Distill (Groq)
         if (isReasoningTask(lowerQuery) || deepThinking) {
-            return selectReasoningModel()
+            return "deepseek-r1-distill-70b"
         }
         
-        // 3. 写代码/编程任务 → 代码能力强的模型
+        // 3. 写代码/编程任务 → DeepSeek-V3.1 (SambaNova)
         if (isCodingTask(lowerQuery)) {
-            return selectCodingModel()
+            return "DeepSeek-V3.1"
         }
         
-        // 4. 中文写作/翻译/文案 → 中文优化模型
+        // 4. 中文写作/翻译/文案 → Kimi K2 (Groq) 中文优化
         if (isChineseTask(lowerQuery)) {
-            return selectChineseModel()
+            return "moonshotai/kimi-k2-instruct"
         }
         
-        // 5. 长文本处理（>2000字） → 大上下文窗口模型
+        // 5. 长文本处理（>2000字） → Gemini 2.5 Flash 1M上下文
         if (query.length > 2000) {
-            return "gemini-2.5-flash" // 1M上下文
+            return "gemini-2.5-flash"
         }
         
-        // 6. 快速简单问答 → 最快的模型
+        // 6. 快速简单问答 → GPT-OSS 20B (Groq 最快)
         if (isSimpleQuery(lowerQuery)) {
-            return "llama-3.1-8b-instant" // Groq最快
+            return "openai/gpt-oss-20b"
         }
         
-        // 7. 复杂任务/需要大模型 → SambaNova 405B
+        // 7. 复杂任务 → GPT-OSS 120B (Groq 大参数)
         if (isComplexTask(lowerQuery)) {
-            return "Meta-Llama-3.1-405B-Instruct"
+            return "openai/gpt-oss-120b"
         }
         
         // 8. 默认 → DeepSeek V4 Flash（平衡）
@@ -68,14 +68,6 @@ object ModelRouter {
     }
     
     /**
-     * 选择推理模型
-     */
-    private fun selectReasoningModel(): String {
-        // 优先使用 Groq DeepSeek-R1-Distill（推理专用，速度快）
-        return "deepseek-r1-distill-70b"
-    }
-    
-    /**
      * 判断是否为编程任务
      */
     private fun isCodingTask(query: String): Boolean {
@@ -91,14 +83,6 @@ object ModelRouter {
     }
     
     /**
-     * 选择编程模型
-     */
-    private fun selectCodingModel(): String {
-        // DeepSeek V3 在代码方面表现优秀
-        return "DeepSeek-V3-0324"
-    }
-    
-    /**
      * 判断是否为中文任务
      */
     private fun isChineseTask(query: String): Boolean {
@@ -108,14 +92,6 @@ object ModelRouter {
             "中文", "汉语", "chinese", "translate", "write"
         )
         return keywords.any { query.contains(it) }
-    }
-    
-    /**
-     * 选择中文优化模型
-     */
-    private fun selectChineseModel(): String {
-        // Qwen3-32B 中文优化最好
-        return "qwen3-32b"
     }
     
     /**
@@ -153,24 +129,19 @@ object ModelRouter {
         return when (modelId) {
             "deepseek-v4-flash" -> "DeepSeek V4 Flash"
             "deepseek-v4-pro" -> "DeepSeek V4 Pro"
-            "deepseek-r1" -> "DeepSeek R1"
-            "DeepSeek-V3-0324" -> "DeepSeek V3"
-            "deepseek-r1-distill-70b" -> "DeepSeek R1 Distill"
             "gemini-2.0-flash" -> "Gemini 2.0 Flash"
             "gemini-2.5-flash" -> "Gemini 2.5 Flash"
             "gemini-2.5-flash-lite" -> "Gemini 2.5 Flash-Lite"
-            "gemini-3-flash" -> "Gemini 3 Flash"
-            "gemini-3.1-flash-lite" -> "Gemini 3.1 Flash-Lite"
+            "openai/gpt-oss-120b" -> "GPT-OSS 120B"
+            "openai/gpt-oss-20b" -> "GPT-OSS 20B"
             "llama-3.3-70b-versatile" -> "Llama 3.3 70B"
-            "llama-3.1-8b-instant" -> "Llama 3.1 8B (最快)"
-            "llama-4-scout-17b-16e-instruct" -> "Llama 4 Scout"
-            "qwen3-32b" -> "Qwen3 32B (中文优化)"
-            "Meta-Llama-3.1-405B-Instruct" -> "Llama 3.1 405B (最大)"
-            "Meta-Llama-3.1-70B-Instruct" -> "Llama 3.1 70B"
-            "Meta-Llama-3.1-8B-Instruct" -> "Llama 3.1 8B"
-            "Qwen2.5-72B-Instruct" -> "Qwen2.5 72B"
-            "Qwen2.5-Coder-32B-Instruct" -> "Qwen2.5 Coder"
-            "DeepSeek-R1" -> "DeepSeek R1"
+            "llama-3.1-8b-instant" -> "Llama 3.1 8B"
+            "deepseek-r1-distill-70b" -> "DeepSeek R1 Distill"
+            "moonshotai/kimi-k2-instruct" -> "Kimi K2"
+            "Meta-Llama-3.3-70B-Instruct" -> "Llama 3.3 70B (SN)"
+            "gpt-oss-120b" -> "GPT-OSS 120B (SN)"
+            "DeepSeek-V3.1" -> "DeepSeek V3.1"
+            "gemma-4-31B-it" -> "Gemma 4 31B"
             "meta-llama/Llama-3.3-70B-Instruct" -> "Llama 3.3 70B (HF)"
             else -> modelId
         }
@@ -183,14 +154,14 @@ object ModelRouter {
         val lowerQuery = query.lowercase()
         
         return when {
-            hasImage -> "📷 图片分析任务 → Gemini 2.5 Flash（多模态最强）"
-            isReasoningTask(lowerQuery) || deepThinking -> "🧠 推理任务 → DeepSeek R1 Distill（推理专用）"
-            isCodingTask(lowerQuery) -> "💻 编程任务 → DeepSeek V3（代码能力强）"
-            isChineseTask(lowerQuery) -> "📝 中文任务 → Qwen3 32B（中文优化）"
-            query.length > 2000 -> "📚 长文本处理 → Gemini 2.5 Flash（1M上下文）"
-            isSimpleQuery(lowerQuery) -> "⚡ 简单问答 → Llama 3.1 8B（最快）"
-            isComplexTask(lowerQuery) -> "🔬 复杂任务 → Llama 3.1 405B（最大模型）"
-            else -> "✨ 通用任务 → DeepSeek V4 Flash（平衡）"
+            hasImage -> "📷 图片分析 → Gemini 2.5 Flash"
+            isReasoningTask(lowerQuery) || deepThinking -> "🧠 推理 → DeepSeek R1 Distill"
+            isCodingTask(lowerQuery) -> "💻 编程 → DeepSeek V3.1"
+            isChineseTask(lowerQuery) -> "📝 中文 → Kimi K2"
+            query.length > 2000 -> "📚 长文本 → Gemini 2.5 Flash"
+            isSimpleQuery(lowerQuery) -> "⚡ 快问快答 → GPT-OSS 20B"
+            isComplexTask(lowerQuery) -> "🔬 复杂任务 → GPT-OSS 120B"
+            else -> "✨ 通用 → DeepSeek V4 Flash"
         }
     }
 }

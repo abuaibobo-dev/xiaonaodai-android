@@ -54,22 +54,18 @@ class AgentEngine @Inject constructor(
     companion object {
         const val MAX_REACT_CYCLES = 5
 
-        /** 模型名 → 所属平台映射 */
+        /** 模型名 → 所属平台映射（仅保留当前可用模型） */
         private val GROQ_MODELS = setOf(
+            "openai/gpt-oss-120b", "openai/gpt-oss-20b",
             "llama-3.3-70b-versatile", "llama-3.1-8b-instant",
-            "llama-4-scout-17b-16e-instruct", "qwen3-32b",
-            "deepseek-r1-distill-70b", "openai/gpt-oss-120b",
-            "moonshotai/kimi-k2-instruct"
+            "deepseek-r1-distill-70b", "moonshotai/kimi-k2-instruct"
         )
         private val SAMBANOVA_MODELS = setOf(
-            "Meta-Llama-3.1-405B-Instruct", "Meta-Llama-3.1-70B-Instruct",
-            "Meta-Llama-3.1-8B-Instruct", "Qwen2.5-72B-Instruct",
-            "Qwen2.5-Coder-32B-Instruct", "Meta-Llama-3.2-11B-Vision-Instruct",
-            "Meta-Llama-3.2-90B-Vision-Instruct", "DeepSeek-R1", "DeepSeek-V3-0324"
+            "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b",
+            "DeepSeek-V3.1", "gemma-4-31B-it"
         )
         private val GEMINI_MODELS = setOf(
-            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite",
-            "gemini-3-flash", "gemini-3.1-flash-lite"
+            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"
         )
         private val HF_MODELS = setOf("meta-llama/Llama-3.3-70B-Instruct")
 
@@ -81,10 +77,6 @@ class AgentEngine @Inject constructor(
             SAMBANOVA_MODELS.contains(model) -> "sambanova"
             HF_MODELS.contains(model) -> "hf"
             model.startsWith("deepseek-") -> "deepseek"
-            model.startsWith("meta-llama/") -> "hf"
-            model.startsWith("meta/") -> "nvidia"
-            model.contains(":free") -> "openrouter"
-            model.startsWith("llama-3.3-70b") && !GROQ_MODELS.contains(model) -> "cerebras"
             else -> "deepseek" // 默认走 DeepSeek
         }
     }
