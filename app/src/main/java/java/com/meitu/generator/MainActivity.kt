@@ -513,7 +513,6 @@ private fun SidebarDrawer(
                             try {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
                                     android.net.Uri.parse("https://platform.deepseek.com/usage"))
-                                val ctx = androidx.compose.ui.platform.LocalContext.current
                                 ctx.startActivity(intent)
                             } catch (_: Exception) {}
                         }
