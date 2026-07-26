@@ -111,6 +111,12 @@ class AssistantViewModel @Inject constructor(
     private val _webSearchEnabled = MutableStateFlow(false)
     val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
 
+    // ============ 错误提示（Snackbar，不混入聊天流） ============
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    fun clearErrorMessage() { _errorMessage.value = null }
+
     fun toggleDeepThinking() {
         _deepThinkingEnabled.value = !_deepThinkingEnabled.value
     }
@@ -345,10 +351,8 @@ class AssistantViewModel @Inject constructor(
                     conversationHistory.removeAt(0)
                 }
             } catch (e: Exception) {
-                _messages.value = (_messages.value + ChatMessage(
-                    text = "❌ AI 调用失败: ${e.message?.take(200)}",
-                    isUser = false
-                )).takeLast(100)
+                // P0修复：错误消息不混入聊天流，改为 Snackbar 提示
+                _errorMessage.value = "❌ AI 调用失败: ${e.message?.take(200)}"
             } finally {
                 _isLoading.value = false
                 _agentStatus.value = null

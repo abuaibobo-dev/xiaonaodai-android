@@ -54,6 +54,10 @@ class SettingsViewModel @Inject constructor(
             try {
                 val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
                 val apiKey = if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
+                if (apiKey.isBlank()) {
+                    _balance.value = BalanceInfo(available = false)
+                    return@launch
+                }
                 val response = deepSeekBalanceService.getBalance("Bearer $apiKey")
                 val cnyInfo = response.balanceInfos.find { it.currency == "CNY" }
                 if (cnyInfo != null) {
@@ -69,7 +73,7 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
-                // 静默失败
+                _balance.value = BalanceInfo(available = false)
             } finally {
                 _balanceLoading.value = false
             }

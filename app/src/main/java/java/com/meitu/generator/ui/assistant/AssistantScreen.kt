@@ -9,9 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -198,6 +200,7 @@ fun AssistantScreen(
 
     val thinkingChain by viewModel.thinkingChain.collectAsState()
     val isThinkingActive by viewModel.isThinkingChainActive.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     LaunchedEffect(Unit) {
         AppEvents.events.collect { event ->
@@ -221,31 +224,68 @@ fun AssistantScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (messages.size <= 1 && !isLoading) { item { EmptyState() } }
+        // 消息列表 + 滚动到底部浮动按钮
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (messages.size <= 1 && !isLoading) { item { EmptyState() } }
 
-            items(messages, key = { it.id }) { msg ->
-                when {
-                    msg.isSystem -> SystemMessageBubble(msg.text)
-                    msg.taskProgress != null -> TaskProgressBubble(msg)
-                    else -> TextMessageBubble(msg, animatedMessageIds, viewModel)
+                items(messages, key = { it.id }) { msg ->
+                    when {
+                        msg.isSystem -> SystemMessageBubble(msg.text)
+                        msg.taskProgress != null -> TaskProgressBubble(msg)
+                        else -> TextMessageBubble(msg, animatedMessageIds, viewModel)
+                    }
+                }
+
+                if (agentStatus != null) {
+                    item { AgentStatusBubble(status = agentStatus!!) }
+                }
+
+                if (isLoading && agentStatus == null) {
+                    item { ThinkingChainIndicator(thinkingChain = thinkingChain, isActive = isThinkingActive) }
+                }
+
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+
+            // 滚动到底部浮动按钮
+            val canScrollDown by remember {
+                derivedStateOf {
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    val totalItems = listState.layoutInfo.totalItemsCount
+                    lastVisible < totalItems - 2
                 }
             }
-
-            if (agentStatus != null) {
-                item { AgentStatusBubble(status = agentStatus!!) }
+            if (canScrollDown) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 8.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(colors.surface.copy(alpha = 0.85f))
+                        .border(0.5.dp, colors.border, CircleShape)
+                        .clickable {
+                            try {
+                                val lastIndex = listState.layoutInfo.totalItemsCount - 1
+                                listState.animateScrollToItem(lastIndex)
+                            } catch (_: Exception) {}
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "滚动到底部",
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-
-            if (isLoading && agentStatus == null) {
-                item { ThinkingChainIndicator(thinkingChain = thinkingChain, isActive = isThinkingActive) }
-            }
-
-            item { Spacer(Modifier.height(8.dp)) }
         }
 
         // ============ 图片预览区 ============
@@ -278,6 +318,31 @@ fun AssistantScreen(
                 showModelDropdown = false
             }
         )
+    }
+
+    // P0修复：错误提示 Snackbar（不混入聊天流）
+    if (errorMessage != null) {
+        LaunchedEffect(errorMessage) {
+            kotlinx.coroutines.delay(3500)
+            viewModel.clearErrorMessage()
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFF4444).copy(alpha = 0.92f))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(errorMessage ?: "", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Medium)
+            }
+        }
     }
 }
 
@@ -477,7 +542,7 @@ private fun SmartInputBar(
                                     activeColor = Color(0xFF00B894),
                                     onClick = onToggleWebSearch
                                 )
-                                // 图片按钮
+                                // 附件按钮（别针图标）
                                 Box(
                                     modifier = Modifier
                                         .size(28.dp)
@@ -487,11 +552,10 @@ private fun SmartInputBar(
                                         .clickable { onPickImage() },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        Icons.Default.Image,
-                                        contentDescription = "选择图片",
-                                        tint = if (pendingImageUri != null) colors.accent else colors.textTertiary,
-                                        modifier = Modifier.size(14.dp)
+                                    Text(
+                                        "📎",
+                                        fontSize = 14.sp,
+                                        color = if (pendingImageUri != null) colors.accent else colors.textTertiary
                                     )
                                 }
                             }
@@ -710,22 +774,26 @@ private fun TextMessageBubble(
                 val isErrorMsg = msg.text.contains("❌") || msg.text.contains("引擎异常") || msg.text.contains("引擎错误") || msg.text.contains("调用失败")
                 val errorColor = Color(0xFFFF4444)
 
-                var renderedTextLen = 0
-                segments.forEach { segment ->
-                    when (segment) {
-                        is MessageSegment.TextSegment -> {
-                            val remaining = (visibleTextLength - renderedTextLen).coerceIn(0, segment.text.length)
-                            if (remaining > 0) {
-                                val textColor = if (isErrorMsg) errorColor
-                                    else if (msg.isUser) colors.messageUserText
-                                    else colors.messageAiText
-                                Text(text = segment.text.take(remaining), fontSize = 15.sp, color = textColor, lineHeight = 22.sp)
-                            }
-                            renderedTextLen += segment.text.length
-                        }
-                        is MessageSegment.CodeSegment -> {
-                            if (visibleTextLength >= fullTextLength || msg.isUser || msg.isSystem) {
-                                CodeBlockCard(language = segment.language, code = segment.code, fileName = segment.fileName)
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        var renderedTextLen = 0
+                        segments.forEach { segment ->
+                            when (segment) {
+                                is MessageSegment.TextSegment -> {
+                                    val remaining = (visibleTextLength - renderedTextLen).coerceIn(0, segment.text.length)
+                                    if (remaining > 0) {
+                                        val textColor = if (isErrorMsg) errorColor
+                                            else if (msg.isUser) colors.messageUserText
+                                            else colors.messageAiText
+                                        Text(text = segment.text.take(remaining), fontSize = 15.sp, color = textColor, lineHeight = 22.sp)
+                                    }
+                                    renderedTextLen += segment.text.length
+                                }
+                                is MessageSegment.CodeSegment -> {
+                                    if (visibleTextLength >= fullTextLength || msg.isUser || msg.isSystem) {
+                                        CodeBlockCard(language = segment.language, code = segment.code, fileName = segment.fileName)
+                                    }
+                                }
                             }
                         }
                     }

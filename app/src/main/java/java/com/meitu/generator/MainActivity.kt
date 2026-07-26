@@ -3,6 +3,8 @@ package com.meitu.generator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -116,8 +118,8 @@ fun MainScreen() {
         // ============ 侧边栏遮罩 ============
         AnimatedVisibility(
             visible = drawerOpen,
-            enter = slideInHorizontally(),
-            exit = slideOutHorizontally()
+            enter = fadeIn(),
+            exit = fadeOut()
         ) {
             Box(
                 modifier = Modifier
@@ -466,7 +468,7 @@ private fun SidebarDrawer(
                         "¥${balance.totalBalance}",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = colors.accent
+                        color = if ((balance.totalBalance.toFloatOrNull() ?: 0f) < 0) colors.error else colors.accent
                     )
                 }
                 // 一键查询用量

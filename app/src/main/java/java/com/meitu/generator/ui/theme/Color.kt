@@ -2,31 +2,31 @@ package com.meitu.generator.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ============ 亮色模式配色 ============
+// ============ 亮色模式配色（统一深色底） ============
 object LightColors {
-    val Background = Color(0xFFFFFFFF)       // 纯白
-    val Surface = Color(0xFFF5F5F5)          // 卡片/表面
-    val TextPrimary = Color(0xFF000000)       // 文字主色
-    val TextSecondary = Color(0xFF666666)     // 文字次要
-    val Border = Color(0xFFE0E0E0)            // 边框/分割
-    val Accent = Color(0xFFC9A96E)            // 香槟金强调色
-    val AccentDisabled = Color(0xFFD4C5A0)    // 香槟金禁用态
-    val MessageUserBg = Color(0xFFFFFFFF)     // 用户消息背景
-    val MessageAiBg = Color(0xFF2A2A2A)       // AI消息背景
-    val MessageAiText = Color(0xFFFFFFFF)     // AI消息文字
-    val SystemBg = Color(0xFFF0F0F0)          // 系统消息背景
-    val Error = Color(0xFFCC3333)             // 错误
-    val Success = Color(0xFF339933)           // 成功
-    val Warning = Color(0xFFCC9933)           // 警告
-    val Online = Color(0xFF339933)            // 在线状态
-    val AccentAlpha12 = Color(0x1FC9A96E)     // 强调色12%透明
-    val TextTertiary = Color(0xFF999999)      // 三级文字
-    val MessageUserText = Color(0xFF000000)   // 用户消息文字(亮色)
+    val Background = Color(0xFF000000)       // 纯黑
+    val Surface = Color(0xFF1A1A1A)          // 卡片/表面
+    val TextPrimary = Color(0xFFFFFFFF)      // 文字主色
+    val TextSecondary = Color(0xFF999999)    // 文字次要
+    val Border = Color(0xFF333333)           // 边框/分割
+    val Accent = Color(0xFFC9A96E)           // 香槟金强调色
+    val AccentDisabled = Color(0xFF7A6B4A)   // 香槟金禁用态
+    val MessageUserBg = Color(0xFF2A2A2A)    // 用户消息背景
+    val MessageAiBg = Color(0xFF1A1A1A)      // AI消息背景
+    val MessageAiText = Color(0xFFFFFFFF)    // AI消息文字
+    val SystemBg = Color(0xFF121212)         // 系统消息背景
+    val Error = Color(0xFFFF5555)            // 错误
+    val Success = Color(0xFF55CC55)          // 成功
+    val Warning = Color(0xFFFFBB44)          // 警告
+    val Online = Color(0xFF55CC55)           // 在线状态
+    val AccentAlpha12 = Color(0x1FC9A96E)    // 强调色12%透明
+    val TextTertiary = Color(0xFF666666)     // 三级文字
+    val MessageUserText = Color(0xFFFFFFFF)  // 用户消息文字(亮色)
 }
 
-// ============ 暗色模式配色 ============
+// ============ 暗色模式配色（统一深色底） ============
 object DarkColors {
-    val Background = Color(0xFF0D0D0D)       // 深灰背景
+    val Background = Color(0xFF000000)       // 纯黑背景
     val Surface = Color(0xFF1A1A1A)          // 卡片/表面
     val TextPrimary = Color(0xFFFFFFFF)      // 文字主色
     val TextSecondary = Color(0xFF999999)    // 文字次要
