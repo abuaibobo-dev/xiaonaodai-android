@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.google.gson.GsonBuilder
-import com.meitu.generator.data.remote.DeepSeekBalanceService
 import com.meitu.generator.data.remote.GitHubService
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.data.remote.dto.OpenAIMessage
@@ -60,7 +59,6 @@ object NetworkModule {
         )
     }
 
-    // ============ 自定义 Gson（支持多模态消息） ============
     @Provides
     @Singleton
     @Named("openaiGson")
@@ -68,11 +66,10 @@ object NetworkModule {
         return GsonBuilder()
             .registerTypeAdapter(OpenAIMessage::class.java, OpenAIMessageSerializer())
             .registerTypeAdapter(OpenAIMessage::class.java, OpenAIMessageDeserializer())
-
             .create()
     }
 
-    // ============ OpenAI 兼容 API（主力 AI 大脑） ============
+    // ============ OpenRouter API（主力） ============
     @Provides
     @Singleton
     @Named("openai")
@@ -90,7 +87,45 @@ object NetworkModule {
         return retrofit.create(OpenAIService::class.java)
     }
 
-    // ============ GitHub API (云端编译) ============
+    // ============ OpenRouter API（显式引用） ============
+    @Provides
+    @Singleton
+    @Named("openrouter")
+    fun provideOpenRouterRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.OPENROUTER_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("openrouterService")
+    fun provideOpenRouterService(@Named("openrouter") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ SambaNova API（备用） ============
+    @Provides
+    @Singleton
+    @Named("sambanova")
+    fun provideSambaNovaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.SAMBANOVA_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("sambanovaService")
+    fun provideSambaNovaService(@Named("sambanova") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ GitHub API ============
     @Provides
     @Singleton
     @Named("github")
@@ -129,155 +164,5 @@ object NetworkModule {
     @Singleton
     fun provideGitHubService(@Named("github") retrofit: Retrofit): GitHubService {
         return retrofit.create(GitHubService::class.java)
-    }
-
-    // ============ DeepSeek 余额查询 ============
-    @Provides
-    @Singleton
-    @Named("deepseek")
-    fun provideDeepSeekRetrofit(client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl("https://api.deepseek.com/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideDeepSeekBalanceService(@Named("deepseek") retrofit: Retrofit): DeepSeekBalanceService {
-        return retrofit.create(DeepSeekBalanceService::class.java)
-    }
-
-    // ============ Google Gemini API ============
-    @Provides
-    @Singleton
-    @Named("gemini")
-    fun provideGeminiRetrofit(client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(com.meitu.generator.util.Constants.GEMINI_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideGeminiService(@Named("gemini") retrofit: Retrofit): com.meitu.generator.data.remote.GeminiService {
-        return retrofit.create(com.meitu.generator.data.remote.GeminiService::class.java)
-    }
-
-    // ============ Groq API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("groq")
-    fun provideGroqRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.GROQ_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("groqService")
-    fun provideGroqService(@Named("groq") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
-    }
-
-    // ============ SambaNova API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("sambanova")
-    fun provideSambaNovaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.SAMBANOVA_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("sambanovaService")
-    fun provideSambaNovaService(@Named("sambanova") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
-    }
-
-    // ============ HuggingFace API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("hf")
-    fun provideHfRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.HF_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("hfService")
-    fun provideHfService(@Named("hf") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
-    }
-
-    // ============ OpenRouter API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("openrouter")
-    fun provideOpenRouterRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.OPENROUTER_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("openrouterService")
-    fun provideOpenRouterService(@Named("openrouter") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
-    }
-
-    // ============ Cerebras API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("cerebras")
-    fun provideCerebrasRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.CEREBRAS_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("cerebrasService")
-    fun provideCerebrasService(@Named("cerebras") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
-    }
-
-    // ============ NVIDIA NIM API (免费备用 - OpenAI 兼容) ============
-    @Provides
-    @Singleton
-    @Named("nvidia")
-    fun provideNvidiaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.NVIDIA_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @Named("nvidiaService")
-    fun provideNvidiaService(@Named("nvidia") retrofit: Retrofit): OpenAIService {
-        return retrofit.create(OpenAIService::class.java)
     }
 }

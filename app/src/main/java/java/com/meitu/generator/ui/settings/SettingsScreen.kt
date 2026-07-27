@@ -33,38 +33,18 @@ fun SettingsScreen(
 ) {
     val colors = LocalAppColors.current
     val githubToken by viewModel.githubToken.collectAsState()
-    val aiApiKey by viewModel.aiApiKey.collectAsState()
-    val geminiApiKey by viewModel.geminiApiKey.collectAsState()
-    val groqApiKey by viewModel.groqApiKey.collectAsState()
-    val sambanovaApiKey by viewModel.sambanovaApiKey.collectAsState()
-    val hfApiKey by viewModel.hfApiKey.collectAsState()
     val openrouterApiKey by viewModel.openrouterApiKey.collectAsState()
-    val cerebrasApiKey by viewModel.cerebrasApiKey.collectAsState()
-    val nvidiaApiKey by viewModel.nvidiaApiKey.collectAsState()
+    val sambanovaApiKey by viewModel.sambanovaApiKey.collectAsState()
     val showClearConfirm by viewModel.showClearConfirm.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val privacyEnabled by viewModel.privacyModeEnabled.collectAsState()
 
     var showTokenDialog by remember { mutableStateOf(false) }
-    var showApiKeyDialog by remember { mutableStateOf(false) }
-    var showGeminiKeyDialog by remember { mutableStateOf(false) }
-    var showGroqKeyDialog by remember { mutableStateOf(false) }
-    var showSambanovaKeyDialog by remember { mutableStateOf(false) }
-    var showHfKeyDialog by remember { mutableStateOf(false) }
     var showOpenRouterKeyDialog by remember { mutableStateOf(false) }
-    var showCerebrasKeyDialog by remember { mutableStateOf(false) }
-    var showNvidiaKeyDialog by remember { mutableStateOf(false) }
+    var showSambanovaKeyDialog by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf(githubToken) }
-    var apiKeyInput by remember { mutableStateOf(aiApiKey) }
-    var geminiKeyInput by remember { mutableStateOf(geminiApiKey) }
-    var groqKeyInput by remember { mutableStateOf(groqApiKey) }
-    var sambanovaKeyInput by remember { mutableStateOf(sambanovaApiKey) }
-    var hfKeyInput by remember { mutableStateOf(hfApiKey) }
     var openrouterKeyInput by remember { mutableStateOf(openrouterApiKey) }
-    var cerebrasKeyInput by remember { mutableStateOf(cerebrasApiKey) }
-    var nvidiaKeyInput by remember { mutableStateOf(nvidiaApiKey) }
-    var isTokenVisible by remember { mutableStateOf(false) }
-    var isApiKeyVisible by remember { mutableStateOf(false) }
+    var sambanovaKeyInput by remember { mutableStateOf(sambanovaApiKey) }
 
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
@@ -80,7 +60,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.ElementSpacing)
         ) {
             // ============ API Key 配置 ============
-            item { SectionTitle("API Key 配置") }
+            item { SectionTitle("AI 模型配置") }
             item {
                 Column(
                     modifier = Modifier
@@ -89,102 +69,49 @@ fun SettingsScreen(
                         .background(colors.surface)
                         .padding(Spacing.CardSpacing)
                 ) {
+                    // OpenRouter（主力）
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("API Key", fontSize = 15.sp, color = colors.textSecondary)
-                        IconButton(onClick = { apiKeyInput = aiApiKey; showApiKeyDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "编辑API Key",
-                                tint = colors.accent,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("OpenRouter（主力）", fontSize = 15.sp, color = colors.textPrimary)
+                            if (openrouterApiKey.isNotBlank()) {
+                                Text(
+                                    "${openrouterApiKey.take(8)}...${openrouterApiKey.takeLast(4)}",
+                                    fontSize = 11.sp, color = colors.success, fontFamily = FontFamily.Monospace
+                                )
+                            } else {
+                                Text("已配置默认 Key", fontSize = 11.sp, color = colors.success)
+                            }
+                        }
+                        IconButton(onClick = { openrouterKeyInput = openrouterApiKey; showOpenRouterKeyDialog = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    if (aiApiKey.isNotBlank()) {
-                        Text(
-                            "${aiApiKey.take(8)}...${aiApiKey.takeLast(4)}",
-                            fontSize = 13.sp,
-                            color = colors.success,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else {
-                        Text("未配置 - 点击编辑添加 Agnes API Key", fontSize = 13.sp, color = colors.error)
-                    }
-                }
-            }
 
-            // ============ 备用模型 API Keys（可折叠） ============
-            item {
-                var backupExpanded by remember { mutableStateOf(false) }
-                val configuredCount = listOf(geminiApiKey, groqApiKey, sambanovaApiKey, hfApiKey, openrouterApiKey, cerebrasApiKey, nvidiaApiKey).count { it.isNotBlank() }
-                
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                ) {
-                    // 折叠头部
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+
+                    // SambaNova（备用）
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { backupExpanded = !backupExpanded }
-                            .padding(Spacing.CardSpacing),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("备用模型 API Keys", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                            Text(
-                                if (configuredCount > 0) "已配置 $configuredCount/7 个平台" else "点击展开配置备用模型",
-                                fontSize = 11.sp,
-                                color = if (configuredCount > 0) colors.success else colors.textTertiary
-                            )
+                            Text("SambaNova（备用）", fontSize = 15.sp, color = colors.textPrimary)
+                            if (sambanovaApiKey.isNotBlank()) {
+                                Text(
+                                    "${sambanovaApiKey.take(8)}...${sambanovaApiKey.takeLast(4)}",
+                                    fontSize = 11.sp, color = colors.success, fontFamily = FontFamily.Monospace
+                                )
+                            } else {
+                                Text("已配置默认 Key", fontSize = 11.sp, color = colors.success)
+                            }
                         }
-                        Text(
-                            if (backupExpanded) "\u25B4" else "\u25BE",
-                            fontSize = 14.sp,
-                            color = colors.textTertiary,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                    
-                    // 展开内容
-                    if (backupExpanded) {
-                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-                        
-                        // Gemini
-                        BackupKeyRow("Google Gemini", geminiApiKey, "aistudio.google.com") {
-                            geminiKeyInput = geminiApiKey; showGeminiKeyDialog = true
-                        }
-                        // Groq
-                        BackupKeyRow("Groq", groqApiKey, "console.groq.com") {
-                            groqKeyInput = groqApiKey; showGroqKeyDialog = true
-                        }
-                        // SambaNova
-                        BackupKeyRow("SambaNova", sambanovaApiKey, "sambanova.ai") {
-                            sambanovaKeyInput = sambanovaApiKey; showSambanovaKeyDialog = true
-                        }
-                        // HuggingFace
-                        BackupKeyRow("HuggingFace", hfApiKey, "huggingface.co") {
-                            hfKeyInput = hfApiKey; showHfKeyDialog = true
-                        }
-                        // OpenRouter
-                        BackupKeyRow("OpenRouter", openrouterApiKey, "openrouter.ai") {
-                            openrouterKeyInput = openrouterApiKey; showOpenRouterKeyDialog = true
-                        }
-                        // Cerebras
-                        BackupKeyRow("Cerebras", cerebrasApiKey, "cloud.cerebras.ai") {
-                            cerebrasKeyInput = cerebrasApiKey; showCerebrasKeyDialog = true
-                        }
-                        // NVIDIA
-                        BackupKeyRow("NVIDIA NIM", nvidiaApiKey, "build.nvidia.com") {
-                            nvidiaKeyInput = nvidiaApiKey; showNvidiaKeyDialog = true
+                        IconButton(onClick = { sambanovaKeyInput = sambanovaApiKey; showSambanovaKeyDialog = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -236,13 +163,8 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Personal Access Token", fontSize = 15.sp, color = colors.textSecondary)
-                        IconButton(onClick = { showTokenDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "编辑Token",
-                                tint = colors.accent,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        IconButton(onClick = { tokenInput = githubToken; showTokenDialog = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "编辑Token", tint = colors.accent, modifier = Modifier.size(18.dp))
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -279,21 +201,14 @@ fun SettingsScreen(
             item { Spacer(Modifier.height(80.dp)) }
         }
 
-        // Toast overlay at top
+        // Toast
         if (toastMessage != null) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .padding(horizontal = Spacing.PagePadding, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(horizontal = Spacing.PagePadding, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Button))
-                        .background(colors.success.copy(alpha = 0.9f))
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(CornerRadius.Button)).background(colors.success.copy(alpha = 0.9f)).padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(toastMessage ?: "", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Medium)
@@ -302,7 +217,7 @@ fun SettingsScreen(
         }
     }
 
-    // Token edit dialog
+    // Token dialog
     if (showTokenDialog) {
         AlertDialog(
             onDismissRequest = { showTokenDialog = false },
@@ -313,108 +228,74 @@ fun SettingsScreen(
                     Text("需要 Classic PAT（ghp_ 开头），勾选 repo + workflow 权限", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = tokenInput,
-                        onValueChange = { tokenInput = it },
+                        value = tokenInput, onValueChange = { tokenInput = it },
                         label = { Text("ghp_xxxx", color = colors.textTertiary) },
                         singleLine = true,
-                        visualTransformation = if (isTokenVisible)
-                            androidx.compose.ui.text.input.VisualTransformation.None
-                        else
-                            androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { isTokenVisible = !isTokenVisible }) {
-                                Icon(
-                                    if (isTokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = null,
-                                    tint = colors.textTertiary
-                                )
-                            }
-                        },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
                         ),
-                        shape = RoundedCornerShape(CornerRadius.Input),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.saveGithubToken(tokenInput.trim())
-                        showTokenDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                ) { Text("保存") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showTokenDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
-                ) { Text("取消") }
-            }
+            confirmButton = { TextButton(onClick = { viewModel.saveGithubToken(tokenInput.trim()); showTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
     }
 
-    // API Key edit dialog
-    if (showApiKeyDialog) {
+    // OpenRouter Key dialog
+    if (showOpenRouterKeyDialog) {
         AlertDialog(
-            onDismissRequest = { showApiKeyDialog = false },
+            onDismissRequest = { showOpenRouterKeyDialog = false },
             containerColor = colors.surface,
-            title = { Text("设置 AI API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            title = { Text("设置 OpenRouter API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("填入 Agnes API Key（主力模型，永久免费）", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 openrouter.ai 获取，用于主力模型", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = { apiKeyInput = it },
-                        label = { Text("API Key", color = colors.textTertiary) },
+                        value = openrouterKeyInput, onValueChange = { openrouterKeyInput = it },
+                        label = { Text("OpenRouter API Key", color = colors.textTertiary) },
                         singleLine = true,
-                        visualTransformation = if (isApiKeyVisible)
-                            androidx.compose.ui.text.input.VisualTransformation.None
-                        else
-                            androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
-                                Icon(
-                                    if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = null,
-                                    tint = colors.textTertiary
-                                )
-                            }
-                        },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
                         ),
-                        shape = RoundedCornerShape(CornerRadius.Input),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.saveApiKey(apiKeyInput.trim())
-                        showApiKeyDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                ) { Text("保存") }
+            confirmButton = { TextButton(onClick = { viewModel.saveOpenRouterApiKey(openrouterKeyInput.trim()); showOpenRouterKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showOpenRouterKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // SambaNova Key dialog
+    if (showSambanovaKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showSambanovaKeyDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置 SambaNova API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 sambanova.ai 获取，用于备用模型", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = sambanovaKeyInput, onValueChange = { sambanovaKeyInput = it },
+                        label = { Text("SambaNova API Key", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = { showApiKeyDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
-                ) { Text("取消") }
-            }
+            confirmButton = { TextButton(onClick = { viewModel.saveSambaNovaApiKey(sambanovaKeyInput.trim()); showSambanovaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showSambanovaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
     }
 
@@ -429,228 +310,15 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = { viewModel.dismissClearAll() }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
     }
-
-    // Gemini API Key edit dialog
-    if (showGeminiKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showGeminiKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 Google API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 aistudio.google.com 免费获取，用于 Gemini 备用模型", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = geminiKeyInput,
-                        onValueChange = { geminiKeyInput = it },
-                        label = { Text("Google API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.saveGeminiApiKey(geminiKeyInput.trim())
-                        showGeminiKeyDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                ) { Text("保存") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showGeminiKeyDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
-                ) { Text("取消") }
-            }
-        )
-    }
-
-    // Groq API Key edit dialog
-    if (showGroqKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showGroqKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 Groq API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 console.groq.com 免费获取，用于 Groq 备用模型（Llama 3.3 70B）", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = groqKeyInput,
-                        onValueChange = { groqKeyInput = it },
-                        label = { Text("Groq API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.saveGroqApiKey(groqKeyInput.trim())
-                        showGroqKeyDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                ) { Text("保存") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showGroqKeyDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)
-                ) { Text("取消") }
-            }
-        )
-    }
-
-    // SambaNova API Key dialog
-    if (showSambanovaKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showSambanovaKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 SambaNova API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 sambanova.ai 免费获取", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = sambanovaKeyInput, onValueChange = { sambanovaKeyInput = it },
-                        label = { Text("SambaNova API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary, focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { viewModel.saveSambaNovaApiKey(sambanovaKeyInput.trim()); showSambanovaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showSambanovaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
-        )
-    }
-
-    // HuggingFace Token dialog
-    if (showHfKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showHfKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 HuggingFace Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 huggingface.co 免费获取", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = hfKeyInput, onValueChange = { hfKeyInput = it },
-                        label = { Text("HuggingFace Token", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary, focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { viewModel.saveHfApiKey(hfKeyInput.trim()); showHfKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showHfKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
-        )
-    }
-
-    // OpenRouter API Key dialog
-    if (showOpenRouterKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showOpenRouterKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 OpenRouter API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 openrouter.ai 免费获取，43+ 免费模型", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = openrouterKeyInput, onValueChange = { openrouterKeyInput = it },
-                        label = { Text("OpenRouter API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary, focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { viewModel.saveOpenRouterApiKey(openrouterKeyInput.trim()); showOpenRouterKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showOpenRouterKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
-        )
-    }
-
-    // Cerebras API Key dialog
-    if (showCerebrasKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showCerebrasKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 Cerebras API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 cloud.cerebras.ai 免费获取", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = cerebrasKeyInput, onValueChange = { cerebrasKeyInput = it },
-                        label = { Text("Cerebras API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary, focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { viewModel.saveCerebrasApiKey(cerebrasKeyInput.trim()); showCerebrasKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showCerebrasKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
-        )
-    }
-
-    // NVIDIA API Key dialog
-    if (showNvidiaKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showNvidiaKeyDialog = false },
-            containerColor = colors.surface,
-            title = { Text("设置 NVIDIA API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    Text("从 build.nvidia.com 免费获取", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = nvidiaKeyInput, onValueChange = { nvidiaKeyInput = it },
-                        label = { Text("NVIDIA API Key", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary, focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { viewModel.saveNvidiaApiKey(nvidiaKeyInput.trim()); showNvidiaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { showNvidiaKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
-        )
-    }
 }
 
 @Composable
 fun SettingRow(title: String, value: String, color: Color = Color.Unspecified, onClick: (() -> Unit)? = null) {
     val colors = LocalAppColors.current
     val textColor = if (color != Color.Unspecified) color else colors.textPrimary
-    
     Column {
         Row(
-            modifier = Modifier
-                .fillMaxWidth().height(52.dp)
-                .background(colors.surface)
+            modifier = Modifier.fillMaxWidth().height(52.dp).background(colors.surface)
                 .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
                 .padding(horizontal = Spacing.CardSpacing),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -672,47 +340,5 @@ fun SettingRow(title: String, value: String, color: Color = Color.Unspecified, o
 @Composable
 fun SectionTitle(text: String) {
     val colors = LocalAppColors.current
-    Text(
-        text = text,
-        fontSize = 13.sp,
-        color = colors.textTertiary,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(vertical = 8.dp)
-    )
-}
-
-@Composable
-private fun BackupKeyRow(name: String, apiKey: String, sourceHint: String, onEdit: () -> Unit) {
-    val colors = LocalAppColors.current
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onEdit() }
-                .padding(horizontal = Spacing.CardSpacing, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(name, fontSize = 14.sp, color = colors.textPrimary)
-                if (apiKey.isNotBlank()) {
-                    Text(
-                        "${apiKey.take(6)}...${apiKey.takeLast(4)}",
-                        fontSize = 11.sp,
-                        color = colors.success,
-                        fontFamily = FontFamily.Monospace
-                    )
-                } else {
-                    Text("未配置 ($sourceHint 获取)", fontSize = 11.sp, color = colors.textTertiary)
-                }
-            }
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "编辑",
-                tint = colors.accent,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-    }
+    Text(text = text, fontSize = 13.sp, color = colors.textTertiary, letterSpacing = 1.sp, modifier = Modifier.padding(vertical = 8.dp))
 }

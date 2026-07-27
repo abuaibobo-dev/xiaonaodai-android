@@ -11,7 +11,6 @@ import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.agent.AgentEngine
 import com.meitu.generator.data.agent.IntentRouter
 import com.meitu.generator.data.agent.ThinkingChainManager
-import com.meitu.generator.data.remote.DeepSeekBalanceService
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.data.remote.dto.OpenAIMessage
 import com.meitu.generator.data.remote.dto.OpenAIRequest
@@ -46,21 +45,12 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-data class BalanceInfo(
-    val totalBalance: String = "--",
-    val toppedUp: String = "--",
-    val used: String = "--",
-    val available: Boolean = true,
-    val currency: String = "CNY"
-)
-
 @HiltViewModel
 class AssistantViewModel @Inject constructor(
     application: Application,
     private val settingsRepo: SettingsRepository,
     private val openAIService: OpenAIService,
     private val agentEngine: AgentEngine,
-    private val deepSeekBalanceService: DeepSeekBalanceService,
     @Named("securePrefs") private val securePrefs: SharedPreferences
 ) : AndroidViewModel(application) {
 
@@ -133,13 +123,6 @@ class AssistantViewModel @Inject constructor(
         _animatedMessageIds.add(msgId)
     }
 
-    // ============ 余额信息 ============
-    private val _balance = MutableStateFlow(BalanceInfo())
-    val balance: StateFlow<BalanceInfo> = _balance.asStateFlow()
-
-    private val _balanceLoading = MutableStateFlow(false)
-    val balanceLoading: StateFlow<Boolean> = _balanceLoading.asStateFlow()
-
     // ============ Conversation History ============
     private val conversationHistory = mutableListOf<OpenAIMessage>()
 
@@ -147,35 +130,6 @@ class AssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedModel = settingsRepo.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
             _currentModel.value = savedModel
-        }
-        refreshBalance()
-    }
-
-    fun refreshBalance() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _balanceLoading.value = true
-            try {
-                val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
-                val apiKey = if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
-                val response = deepSeekBalanceService.getBalance("Bearer $apiKey")
-                val cnyInfo = response.balanceInfos.find { it.currency == "CNY" }
-                if (cnyInfo != null) {
-                    val toppedUp = cnyInfo.toppedUpBalance.toFloatOrNull() ?: 0f
-                    val total = cnyInfo.totalBalance.toFloatOrNull() ?: 0f
-                    val used = toppedUp - total
-                    _balance.value = BalanceInfo(
-                        totalBalance = "%.2f".format(total),
-                        toppedUp = "%.2f".format(toppedUp),
-                        used = "%.2f".format(used),
-                        available = response.isAvailable,
-                        currency = "CNY"
-                    )
-                }
-            } catch (e: Exception) {
-                // 静默失败
-            } finally {
-                _balanceLoading.value = false
-            }
         }
     }
 

@@ -61,7 +61,7 @@ class DeveloperTool @Inject constructor(
         val codeContext = arguments["context"] as? String ?: ""
 
         val model = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
-        val effectiveModel = if (model == "auto" || model.isBlank()) "agnes-2.5-flash" else model
+        val effectiveModel = if (model == "auto" || model.isBlank()) "nvidia/nemotron-3-super-120b-a12b:free" else model
 
         val prompt = buildString {
             appendLine("你是一个 Android 开发专家。请根据需求生成完整的 Kotlin 代码文件。")

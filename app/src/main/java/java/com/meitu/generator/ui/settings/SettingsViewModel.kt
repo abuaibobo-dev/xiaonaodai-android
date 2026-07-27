@@ -6,24 +6,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.local.dao.LogDao
 import com.meitu.generator.data.local.dao.TaskDao
-import com.meitu.generator.data.remote.DeepSeekBalanceService
 import com.meitu.generator.data.security.PrivacyModeManager
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
-
-data class BalanceInfo(
-    val totalBalance: String = "--",
-    val toppedUp: String = "--",
-    val used: String = "--",
-    val available: Boolean = true,
-    val currency: String = "CNY"
-)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -32,53 +22,10 @@ class SettingsViewModel @Inject constructor(
     @Named("securePrefs") private val securePrefs: SharedPreferences,
     private val taskDao: TaskDao,
     private val logDao: LogDao,
-    private val privacyModeManager: PrivacyModeManager,
-    private val deepSeekBalanceService: DeepSeekBalanceService
+    private val privacyModeManager: PrivacyModeManager
 ) : AndroidViewModel(application) {
 
-    // ============ 余额信息 ============
-    private val _balance = MutableStateFlow(BalanceInfo())
-    val balance: StateFlow<BalanceInfo> = _balance.asStateFlow()
-
-    private val _balanceLoading = MutableStateFlow(false)
-    val balanceLoading: StateFlow<Boolean> = _balanceLoading.asStateFlow()
-
-    init {
-        refreshBalance()
-        refreshAllApiKeys()
-    }
-
-    fun refreshBalance() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _balanceLoading.value = true
-            try {
-                val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
-                val apiKey = if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
-                if (apiKey.isBlank()) {
-                    _balance.value = BalanceInfo(available = false)
-                    return@launch
-                }
-                val response = deepSeekBalanceService.getBalance("Bearer $apiKey")
-                val cnyInfo = response.balanceInfos.find { it.currency == "CNY" }
-                if (cnyInfo != null) {
-                    val toppedUp = cnyInfo.toppedUpBalance.toFloatOrNull() ?: 0f
-                    val total = cnyInfo.totalBalance.toFloatOrNull() ?: 0f
-                    val used = toppedUp - total
-                    _balance.value = BalanceInfo(
-                        totalBalance = "%.2f".format(total),
-                        toppedUp = "%.2f".format(toppedUp),
-                        used = "%.2f".format(used),
-                        available = response.isAvailable,
-                        currency = "CNY"
-                    )
-                }
-            } catch (e: Exception) {
-                _balance.value = BalanceInfo(available = false)
-            } finally {
-                _balanceLoading.value = false
-            }
-        }
-    }
+    init { }
 
     val currentBrainModel: StateFlow<String> = settingsRepo.getStringFlow(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
         .stateIn(viewModelScope, SharingStarted.Lazily, Constants.OPENAI_MODEL)
@@ -88,40 +35,20 @@ class SettingsViewModel @Inject constructor(
         emit(saved.ifBlank { Constants.DEFAULT_GITHUB_TOKEN })
     }.stateIn(viewModelScope, SharingStarted.Lazily, Constants.DEFAULT_GITHUB_TOKEN)
 
-    // ============ API Keys（MutableStateFlow，保存后同步更新UI） ============
-    private val _aiApiKey = MutableStateFlow("")
-    val aiApiKey: StateFlow<String> = _aiApiKey.asStateFlow()
-
-    private val _geminiApiKey = MutableStateFlow("")
-    val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
-
-    private val _groqApiKey = MutableStateFlow("")
-    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
+    // ============ API Keys（仅保留可用平台） ============
+    private val _openrouterApiKey = MutableStateFlow("")
+    val openrouterApiKey: StateFlow<String> = _openrouterApiKey.asStateFlow()
 
     private val _sambanovaApiKey = MutableStateFlow("")
     val sambanovaApiKey: StateFlow<String> = _sambanovaApiKey.asStateFlow()
 
-    private val _hfApiKey = MutableStateFlow("")
-    val hfApiKey: StateFlow<String> = _hfApiKey.asStateFlow()
+    init {
+        refreshApiKeys()
+    }
 
-    private val _openrouterApiKey = MutableStateFlow("")
-    val openrouterApiKey: StateFlow<String> = _openrouterApiKey.asStateFlow()
-
-    private val _cerebrasApiKey = MutableStateFlow("")
-    val cerebrasApiKey: StateFlow<String> = _cerebrasApiKey.asStateFlow()
-
-    private val _nvidiaApiKey = MutableStateFlow("")
-    val nvidiaApiKey: StateFlow<String> = _nvidiaApiKey.asStateFlow()
-
-    private fun refreshAllApiKeys() {
-        _aiApiKey.value = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
-        _geminiApiKey.value = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "") ?: ""
-        _groqApiKey.value = securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: ""
-        _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
-        _hfApiKey.value = securePrefs.getString(Constants.KEY_HF_API_KEY, "") ?: ""
+    private fun refreshApiKeys() {
         _openrouterApiKey.value = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
-        _cerebrasApiKey.value = securePrefs.getString(Constants.KEY_CEREBRAS_API_KEY, "") ?: ""
-        _nvidiaApiKey.value = securePrefs.getString(Constants.KEY_NVIDIA_API_KEY, "") ?: ""
+        _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
     }
 
     private val _showClearConfirm = MutableStateFlow(false)
@@ -130,9 +57,7 @@ class SettingsViewModel @Inject constructor(
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
-
-    // 隐私模式
-    val privacyModeEnabled: kotlinx.coroutines.flow.StateFlow<Boolean> = privacyModeManager.privacyModeEnabled
+    val privacyModeEnabled: StateFlow<Boolean> = privacyModeManager.privacyModeEnabled
 
     fun setBrainModel(model: String) {
         viewModelScope.launch { settingsRepo.setString(Constants.KEY_AI_MODEL, model) }
@@ -142,53 +67,16 @@ class SettingsViewModel @Inject constructor(
         securePrefs.edit().putString(Constants.KEY_GITHUB_TOKEN, token).apply()
     }
 
-    fun saveApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_AI_API_KEY, key).apply()
-        _aiApiKey.value = key
-        _toastMessage.value = "✅ DeepSeek API Key 已保存"
-        refreshBalance()
-    }
-
-    fun saveGeminiApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_GEMINI_API_KEY, key).apply()
-        _geminiApiKey.value = key
-        _toastMessage.value = "✅ Google API Key 已保存"
-    }
-
-    fun saveGroqApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_GROQ_API_KEY, key).apply()
-        _groqApiKey.value = key
-        _toastMessage.value = "✅ Groq API Key 已保存"
-    }
-
-    fun saveSambaNovaApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_SAMBANOVA_API_KEY, key).apply()
-        _sambanovaApiKey.value = key
-        _toastMessage.value = "✅ SambaNova API Key 已保存"
-    }
-
-    fun saveHfApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_HF_API_KEY, key).apply()
-        _hfApiKey.value = key
-        _toastMessage.value = "✅ HuggingFace API Key 已保存"
-    }
-
     fun saveOpenRouterApiKey(key: String) {
         securePrefs.edit().putString(Constants.KEY_OPENROUTER_API_KEY, key).apply()
         _openrouterApiKey.value = key
         _toastMessage.value = "✅ OpenRouter API Key 已保存"
     }
 
-    fun saveCerebrasApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_CEREBRAS_API_KEY, key).apply()
-        _cerebrasApiKey.value = key
-        _toastMessage.value = "✅ Cerebras API Key 已保存"
-    }
-
-    fun saveNvidiaApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_NVIDIA_API_KEY, key).apply()
-        _nvidiaApiKey.value = key
-        _toastMessage.value = "✅ NVIDIA API Key 已保存"
+    fun saveSambaNovaApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_SAMBANOVA_API_KEY, key).apply()
+        _sambanovaApiKey.value = key
+        _toastMessage.value = "✅ SambaNova API Key 已保存"
     }
 
     fun clearCache() {
@@ -210,10 +98,9 @@ class SettingsViewModel @Inject constructor(
             settingsRepo.initDefaults()
             _showClearConfirm.value = false
             _toastMessage.value = "所有数据已清空"
-            refreshAllApiKeys()
+            refreshApiKeys()
         }
     }
-
 
     fun togglePrivacyMode() {
         privacyModeManager.setPrivacyMode(!privacyModeManager.privacyModeEnabled.value)
