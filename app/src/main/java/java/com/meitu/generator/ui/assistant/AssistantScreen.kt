@@ -233,7 +233,7 @@ fun AssistantScreen(
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (messages.size <= 1 && !isLoading) { item { EmptyState() } }
+                if (messages.size <= 1 && !isLoading) { item { EmptyState(onSendQuickAction = { text -> viewModel.setInput(text) }) } }
 
                 items(messages, key = { it.id }) { msg ->
                     when {
@@ -397,18 +397,85 @@ private fun SmartModeChip(
 
 // ============ 空状态 ============
 @Composable
-private fun EmptyState() {
+private fun EmptyState(onSendQuickAction: (String) -> Unit = {}) {
     val colors = LocalAppColors.current
+
+    data class QuickAction(val icon: String, val label: String, val prompt: String)
+
+    val quickActions = listOf(
+        QuickAction("💻", "帮我写代码", "帮我写一个Kotlin函数，实现"),
+        QuickAction("🐛", "修复Bug", "我有一个Bug需要修复，问题是"),
+        QuickAction("⚙️", "编译APK", "帮我编译项目并生成APK"),
+        QuickAction("📖", "解释代码", "请帮我解释以下代码的作用："),
+        QuickAction("🎨", "优化UI", "帮我优化界面设计，当前问题是"),
+        QuickAction("🔍", "代码审查", "请帮我审查这段代码，检查潜在问题：")
+    )
+
     Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("\uD83D\uDCAC", fontSize = 36.sp)
-            Text("开始对话，我会记住你的每一次提问", fontSize = 15.sp, color = colors.textTertiary)
+            // 品牌标识区
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("🧠", fontSize = 48.sp)
+                Text("布老师", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Text("你的AI编程助手", fontSize = 14.sp, color = colors.textTertiary)
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // 引导卡片
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colors.surface)
+                    .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("快捷开始", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textSecondary)
+
+                // 快捷操作网格 (2列)
+                val rows = quickActions.chunked(2)
+                rows.forEach { rowActions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowActions.forEach { action ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.background)
+                                    .border(0.5.dp, colors.border, RoundedCornerShape(12.dp))
+                                    .clickable { onSendQuickAction(action.prompt) }
+                                    .padding(vertical = 12.dp, horizontal = 10.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(action.icon, fontSize = 18.sp)
+                                    Text(action.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                                    Text(action.prompt.take(20) + "…", fontSize = 10.sp, color = colors.textTertiary, maxLines = 1)
+                                }
+                            }
+                        }
+                        if (rowActions.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            // 底部提示
+            Text("所有对话都会被记忆，我会越用越懂你 💡", fontSize = 12.sp, color = colors.textTertiary)
         }
     }
 }
