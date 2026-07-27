@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -262,6 +263,7 @@ fun AssistantScreen(
                 }
             }
             if (canScrollDown) {
+                val coroutineScope = rememberCoroutineScope()
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -271,10 +273,12 @@ fun AssistantScreen(
                         .background(colors.surface.copy(alpha = 0.85f))
                         .border(0.5.dp, colors.border, CircleShape)
                         .clickable {
-                            try {
-                                val lastIndex = listState.layoutInfo.totalItemsCount - 1
-                                listState.animateScrollToItem(lastIndex)
-                            } catch (_: Exception) {}
+                            coroutineScope.launch {
+                                try {
+                                    val lastIndex = listState.layoutInfo.totalItemsCount - 1
+                                    listState.animateScrollToItem(lastIndex)
+                                } catch (_: Exception) {}
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
