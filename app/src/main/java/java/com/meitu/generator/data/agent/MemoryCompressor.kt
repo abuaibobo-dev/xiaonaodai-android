@@ -50,7 +50,7 @@ $historyText
 只输出摘要文本，不要解释。"""
 
             val model = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
-            val effectiveModel = if (model == "auto" || model.isBlank()) "deepseek-v4-flash" else model
+            val effectiveModel = if (model == "auto" || model.isBlank()) "agnes-2.5-flash" else model
             val apiKey = (securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "").ifBlank { Constants.OPENAI_API_KEY }
 
             val request = OpenAIRequest(

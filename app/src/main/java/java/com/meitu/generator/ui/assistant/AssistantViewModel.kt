@@ -312,6 +312,30 @@ class AssistantViewModel @Inject constructor(
                 // 获取思考内容
                 val reasoning = _thinkingContent.value
 
+                // === 错误检测：识别工具返回的错误信息，转为 Snackbar 而非聊天消息 ===
+                val errorPatterns = listOf(
+                    "[ERROR]", "[引擎错误]",
+                    "推送失败:", "触发编译失败:", "编译失败", "APK 下载失败",
+                    "云端编译异常", "代码生成失败", "无法从生成结果中提取代码",
+                    "无法获取编译运行状态", "错误: projectCode",
+                    "Payment Required", "HTTP 402", "402"
+                )
+                val isError = errorPatterns.any { response.contains(it, ignoreCase = true) }
+
+                if (isError) {
+                    // HTTP 402 等特殊错误显示友好提示
+                    val isPaymentError = response.contains("402", ignoreCase = true) ||
+                                         response.contains("Payment Required", ignoreCase = true)
+                    val errorMsg = if (isPaymentError) {
+                        "服务暂时不可用，已自动切换备用模型"
+                    } else {
+                        response.take(200)
+                    }
+                    _errorMessage.value = "⚠️ $errorMsg"
+                    // 错误消息不加入聊天流，直接跳过
+                    return@launch
+                }
+
                 if (progressMsgId != null) {
                     val currentProgressMsg = _messages.value.find { it.id == progressMsgId }
                     val hasApk = currentProgressMsg?.taskProgress?.downloadUrl != null

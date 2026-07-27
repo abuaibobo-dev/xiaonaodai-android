@@ -57,7 +57,8 @@ class AgentEngine @Inject constructor(
         /** 模型名 → 所属平台映射（仅保留当前可用模型） */
         private val GROQ_MODELS = setOf(
             "openai/gpt-oss-120b", "openai/gpt-oss-20b",
-            "deepseek-r1-distill-llama-70b", "moonshotai/kimi-k2-instruct"
+            "deepseek-r1-distill-llama-70b", "moonshotai/kimi-k2-instruct",
+            "llama-4-scout"
         )
         private val SAMBANOVA_MODELS = setOf(
             "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b",
@@ -68,16 +69,21 @@ class AgentEngine @Inject constructor(
             "gemini-2.5-flash", "gemini-2.5-flash-lite"
         )
         private val HF_MODELS = setOf("meta-llama/Llama-3.3-70B-Instruct")
+        private val OPENROUTER_MODELS = setOf(
+            "tencent/hy3:free", "baidu/cobuddy:free", "nvidia/nemotron-3-ultra:free"
+        )
 
         fun isGeminiModel(model: String): Boolean = GEMINI_MODELS.contains(model)
 
         fun getModelPlatform(model: String): String = when {
+            model == "agnes-2.5-flash" -> "agnes"
             GEMINI_MODELS.contains(model) -> "gemini"
             GROQ_MODELS.contains(model) -> "groq"
             SAMBANOVA_MODELS.contains(model) -> "sambanova"
             HF_MODELS.contains(model) -> "hf"
+            OPENROUTER_MODELS.contains(model) -> "openrouter"
             model.startsWith("deepseek-") -> "deepseek"
-            else -> "deepseek" // 默认走 DeepSeek
+            else -> "agnes" // 默认走 Agnes
         }
     }
 
@@ -212,7 +218,7 @@ class AgentEngine @Inject constructor(
         query: String,
         imageBase64: String? = null,
         imageMimeType: String? = null,
-        model: String = "deepseek-v4-flash",
+        model: String = "agnes-2.5-flash",
         webSearchEnabled: Boolean = false,
         hasImage: Boolean = false
     ): String {
@@ -263,15 +269,18 @@ class AgentEngine @Inject constructor(
                     thinking = thinkingConfig
                 )
 
-                // 根据模型名路由到正确的 service
+                // 根据模型名路由到正确的 service（ModelRouter 降级链）
                 val response = when (getModelPlatform(model)) {
+                    "agnes" -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}") // Agnes 主力
                     "groq" -> groqService.chatCompletions(request, "Bearer ${getGroqApiKey()}")
                     "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
                     "hf" -> hfService.chatCompletions(request, "Bearer ${getHfApiKey()}")
                     "openrouter" -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
                     "cerebras" -> cerebrasService.chatCompletions(request, "Bearer ${getCerebrasApiKey()}")
                     "nvidia" -> nvidiaService.chatCompletions(request, "Bearer ${getNvidiaApiKey()}")
-                    else -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}") // deepseek 默认
+                    "gemini" -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}") // fallback
+                    "deepseek" -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}") // 最终备用
+                    else -> openAIService.chatCompletions(request, "Bearer ${getApiKey()}")
                 }
 
                 TokenEstimator.account(request.toString(), response.toString())
@@ -576,7 +585,8 @@ class AgentEngine @Inject constructor(
 
     /** 获取 OpenRouter API Key */
     private fun getOpenRouterApiKey(): String {
-        return securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
+        val savedKey = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.OPENROUTER_API_KEY else savedKey
     }
 
     /** 调用 OpenRouter 免费模型 */
@@ -648,7 +658,7 @@ class AgentEngine @Inject constructor(
 输出null如果一步即可完成。只输出JSON，不要解释。"""
 
             val planModel = settingsRepository.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
-            val effectivePlanModel = if (planModel == "auto" || planModel.isBlank()) "deepseek-v4-flash" else planModel
+            val effectivePlanModel = if (planModel == "auto" || planModel.isBlank()) "agnes-2.5-flash" else planModel
             val request = OpenAIRequest(
                 model = effectivePlanModel,
                 messages = listOf(OpenAIMessage(role = "user", content = planPrompt)),

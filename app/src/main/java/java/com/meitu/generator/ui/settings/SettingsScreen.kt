@@ -113,7 +113,7 @@ fun SettingsScreen(
                             fontFamily = FontFamily.Monospace
                         )
                     } else {
-                        Text("未配置 - 点击编辑添加 DeepSeek API Key", fontSize = 13.sp, color = colors.error)
+                        Text("未配置 - 点击编辑添加 Agnes API Key", fontSize = 13.sp, color = colors.error)
                     }
                 }
             }
@@ -368,7 +368,7 @@ fun SettingsScreen(
             title = { Text("设置 AI API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("填入 DeepSeek API Key（从 platform.deepseek.com 获取）", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("填入 Agnes API Key（主力模型，永久免费）", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = apiKeyInput,
