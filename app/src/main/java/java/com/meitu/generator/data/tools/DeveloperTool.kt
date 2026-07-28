@@ -80,33 +80,55 @@ class DeveloperTool @Inject constructor(
             }
             appendLine()
             appendLine("=== 严格要求（违反将导致编译失败） ===")
-            appendLine("1. 必须包含 package 声明（package com.example.app）")
-            appendLine("2. 必须在文件顶部列出 ALL 必要的 import 语句，不能遗漏任何一个")
-            appendLine("3. 必须使用正确的 import 来源：")
-            appendLine("   - Compose UI: androidx.compose.ui.* (ui, Modifier, alignment, etc.)")
-            appendLine("   - Compose Foundation: androidx.compose.foundation.* (layout, clickable, etc.)")
-            appendLine("   - Compose Material3: androidx.compose.material3.*")
-            appendLine("   - Compose Animation: androidx.compose.animation.*")
-            appendLine("   - Compose Graphics: androidx.compose.ui.graphics.* (Color, Brush, etc.)")
-            appendLine("   - Compose Unit: androidx.compose.ui.unit.* (dp, sp, DpSize, etc.)")
-            appendLine("   - Compose Input: androidx.compose.foundation.text.*")
-            appendLine("   - Compose Gestures: androidx.compose.ui.input.pointer.* (pointerInput, detectTapGestures)")
-            appendLine("   - Compose Text: androidx.compose.ui.text.* (TextAlign, TextStyle, etc.)")
-            appendLine("   - Compose Alignment: androidx.compose.ui.Alignment")
-            appendLine("   - Coroutines: kotlinx.coroutines.* (delay, launch, etc.)")
-            appendLine("   - Random: kotlin.random.Random")
-            appendLine("   - Activity: androidx.activity.ComponentActivity")
-            appendLine("   - Bundle: android.os.Bundle")
-            appendLine("   - Graphics: android.graphics.* (Color, etc.)")
-            appendLine("   - Content: androidx.compose.runtime.* (mutableStateOf, remember, LaunchedEffect, etc.)")
-            appendLine("4. 类必须是 ComponentActivity，使用 setContent {} + MaterialTheme {}")
-            appendLine("5. 不要使用任何项目中不存在的第三方库")
-            appendLine("6. 不要使用 android.R 的资源（用自定义的）")
-            appendLine("7. 生成的代码必须能通过 ./gradlew assembleDebug 编译")
+            appendLine("1. 必须以 package com.example.app 开头")
+            appendLine("2. 禁止使用 @AndroidEntryPoint 或任何 Hilt/Dagger 注解")
+            appendLine("3. 类必须继承 androidx.activity.ComponentActivity，不要任何注解")
+            appendLine("4. 必须在 package 之后、class 之前写出所有 import，每个 import 独占一行")
+            appendLine("5. 常用 import（必须按需用到的都写上）：")
+            appendLine("   import android.os.Bundle")
+            appendLine("   import androidx.activity.ComponentActivity")
+            appendLine("   import androidx.activity.compose.setContent")
+            appendLine("   import androidx.compose.runtime.Composable")
+            appendLine("   import androidx.compose.runtime.getValue")
+            appendLine("   import androidx.compose.runtime.setValue")
+            appendLine("   import androidx.compose.runtime.mutableStateOf")
+            appendLine("   import androidx.compose.runtime.remember")
+            appendLine("   import androidx.compose.runtime.LaunchedEffect")
+            appendLine("   import androidx.compose.ui.Modifier")
+            appendLine("   import androidx.compose.ui.unit.dp")
+            appendLine("   import androidx.compose.ui.unit.sp")
+            appendLine("   import androidx.compose.ui.graphics.Color")
+            appendLine("   import androidx.compose.ui.Alignment")
+            appendLine("   import androidx.compose.material3.MaterialTheme")
+            appendLine("   import androidx.compose.material3.Text")
+            appendLine("   import androidx.compose.foundation.layout.*")
+            appendLine("   import kotlinx.coroutines.delay")
+            appendLine("6. 只要使用了 Text、Box、Column、Row、Button、Image、Spacer、fillMaxSize、padding、size、offset、background、clickable 等，必须 import 对应的包")
+            appendLine("7. 不要使用任何项目中不存在的第三方库（禁止 Hilt、禁止 Room、禁止 Retrofit）")
+            appendLine("8. 不要使用 android.R 的资源")
             appendLine()
-            appendLine("只输出代码，不要任何解释。代码格式:")
+            appendLine("=== 文件结构模板 ===")
+            appendLine("package com.example.app")
+            appendLine()
+            appendLine("import android.os.Bundle")
+            appendLine("import androidx.activity.ComponentActivity")
+            appendLine("import androidx.activity.compose.setContent")
+            appendLine("// ... 其他所有需要的 import ...")
+            appendLine()
+            appendLine("class MainActivity : ComponentActivity() {")
+            appendLine("    override fun onCreate(savedInstanceState: Bundle?) {")
+            appendLine("        super.onCreate(savedInstanceState)")
+            appendLine("        setContent {")
+            appendLine("            MaterialTheme {")
+            appendLine("                // 你的 Compose 内容")
+            appendLine("            }")
+            appendLine("        }")
+            appendLine("    }")
+            appendLine("}")
+            appendLine()
+            appendLine("只输出完整 Kotlin 代码（包含 package + 所有 import + 完整实现），不要任何解释。")
             appendLine("```kotlin")
-            appendLine("// 完整的 Kotlin 代码（包含 package + 所有 import + 完整实现）")
+            appendLine("// 完整代码")
             appendLine("```")
         }
 
@@ -123,7 +145,8 @@ class DeveloperTool @Inject constructor(
                 return "代码生成失败: $content"
             }
 
-            val code = extractKotlinCode(content)
+            val rawCode = extractKotlinCode(content)
+            val code = fixGeneratedCode(rawCode)
 
             return buildString {
                 appendLine("✅ 代码生成成功")
@@ -203,6 +226,127 @@ class DeveloperTool @Inject constructor(
     private fun getGeminiApiKey(): String {
         val savedKey = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "")
         return if (savedKey.isNullOrBlank()) Constants.GEMINI_API_KEY else savedKey
+    }
+
+    /**
+     * Post-process AI-generated code to fix common issues:
+     * - Remove @AndroidEntryPoint and other Hilt annotations
+     * - Add missing imports if none are present
+     * - Ensure package declaration exists
+     */
+    private fun fixGeneratedCode(code: String): String {
+        var fixed = code
+        // Remove Hilt annotations
+        fixed = fixed.replace("@AndroidEntryPoint\s*\n".toRegex(), "")
+        fixed = fixed.replace("@Inject\s*\n".toRegex(), "")
+        fixed = fixed.replace("@HiltAndroidApp\s*\n".toRegex(), "")
+        
+        // Check if imports exist
+        val hasImports = fixed.lines().any { it.trimStart().startsWith("import ") }
+        val hasPackage = fixed.lines().any { it.trimStart().startsWith("package ") }
+        
+        if (!hasImports) {
+            // Inject comprehensive common imports after package declaration
+            val fallbackImports = """
+import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Divider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.Constraints
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.random.Random
+""".trimIndent()
+            
+            if (hasPackage) {
+                val lines = fixed.lines().toMutableList()
+                val packageIdx = lines.indexOfFirst { it.trimStart().startsWith("package ") }
+                if (packageIdx >= 0) {
+                    lines.add(packageIdx + 1, "")
+                    lines.add(packageIdx + 2, fallbackImports)
+                    fixed = lines.joinToString("
+")
+                }
+            } else {
+                fixed = "package com.example.app
+
+$fallbackImports
+
+$fixed"
+            }
+        }
+        
+        return fixed
     }
 
     private fun extractKotlinCode(content: String): String {

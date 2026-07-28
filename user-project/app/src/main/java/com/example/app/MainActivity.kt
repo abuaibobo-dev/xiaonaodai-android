@@ -1,68 +1,28 @@
-@AndroidEntryPoint
+package com.example.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                GameScreen()
-            }
-        }
-    }
-}
-
-@Composable
-fun GameScreen() {
-    val density = LocalDensity.current
-    var score by remember { mutableStateOf(0) }
-    var centerOffset by remember { mutableStateOf(Offset.Zero) }
-    val constraints = remember { mutableStateOf<Constraints?>(null) }
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { constraints.value = it }
-    ) {
-        val maxWidth = constraints.value?.maxWidth?.roundToInt() ?: 0
-        val maxHeight = constraints.value?.maxHeight?.roundToInt() ?: 0
-        val circleDiameter = (50.dp * density).roundToPx() * 2 // Actually radius 50.dp => diameter 100.dp
-        // Ensure we have size > 0
-        if (maxWidth > 0 && maxHeight > 0) {
-            LaunchedEffect(Unit) {
-                delay(1500)
-                val randomX = (0..(maxWidth - circleDiameter)).random()
-                val randomY = (0..(maxHeight - circleDiameter)).random()
-                centerOffset = Offset(randomX.toFloat(), randomY.toFloat())
-            }
-        }
-        // Draw circle at offset
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .background(Color.Red, shape = CircleShape)
-                .offset(
-                    x = centerOffset.x.dp,
-                    y = centerOffset.y.dp
-                )
-                .pointerInput(Unit) {
-                    detectTapGestures { tapPos ->
-                        // tapPos is Offset in px
-                        val centerPx = centerOffset * density
-                        val radiusPx = (50.dp * density).roundToPx()
-                        if ((tapPos - centerPx).distance <= radiusPx) {
-                            score++
-                            // generate new position immediately
-                            val randomX = (0..(maxWidth - circleDiameter)).random()
-                            val randomY = (0..(maxHeight - circleDiameter)).random()
-                            centerOffset = Offset(randomX.toFloat(), randomY.toFloat())
-                        }
-                    }
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("布老师 App - 用户项目已就绪")
                 }
-        )
-        // Score text
-        Text(
-            text = "Score: $score",
-            modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-            fontSize = 20.sp,
-            color = Color.Black
-        )
+            }
+        }
     }
 }
