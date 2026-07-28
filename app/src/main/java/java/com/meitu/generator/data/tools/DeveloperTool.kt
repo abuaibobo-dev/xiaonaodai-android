@@ -237,9 +237,9 @@ class DeveloperTool @Inject constructor(
     private fun fixGeneratedCode(code: String): String {
         var fixed = code
         // Remove Hilt annotations
-        fixed = fixed.replace("@AndroidEntryPoint\s*\n".toRegex(), "")
-        fixed = fixed.replace("@Inject\s*\n".toRegex(), "")
-        fixed = fixed.replace("@HiltAndroidApp\s*\n".toRegex(), "")
+        fixed = fixed.replace("""@AndroidEntryPoint\s*\n""".toRegex(), "")
+        fixed = fixed.replace("""@Inject\s*\n""".toRegex(), "")
+        fixed = fixed.replace("""@HiltAndroidApp\s*\n""".toRegex(), "")
         
         // Check if imports exist
         val hasImports = fixed.lines().any { it.trimStart().startsWith("import ") }
