@@ -181,8 +181,7 @@ import kotlinx.coroutines.launch
         val result = filteredLines.toMutableList()
         result.addAll(insertIndex, imports.lines())
         
-        return result.joinToString("
-")
+        return result.joinToString("\n")
     }
 
     private fun extractKotlinCode(content: String): String {
