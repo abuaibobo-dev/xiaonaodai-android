@@ -28,7 +28,7 @@ class CircuitBreaker @Inject constructor(
         // 初始化各工具的提供商池
         providerPools["background_remove"] = listOf("remove_bg", "pollinations")
         providerPools["image_upscale"] = listOf("pollinations", "span")
-        providerPools["image_generate"] = listOf("pollinations", "agnes")
+        providerPools["image_generate"] = listOf("pollinations")
         providerPools["style_transfer"] = listOf("pollinations_kontext", "pollinations")
         providerPools["generate_video"] = listOf("pollinations_video")
         providerPools["text_to_speech"] = listOf("pollinations_audio")

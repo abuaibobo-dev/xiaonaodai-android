@@ -1,35 +1,57 @@
 package com.meitu.generator.util
 
 object Constants {
-    // ============ AI 大脑 - DeepSeek API（主力） ============
+    // ============ AI 大脑 - DeepSeek API ============
     const val OPENAI_BASE_URL = "https://api.deepseek.com/v1/"
     val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,55,50,52,57,100,56,52,48,57,53,99,48,52,97,98,50,56,55,56,102,53,100,97,102,98,55,99,102,55,100,97,52))
     const val OPENAI_MODEL = "deepseek-chat"
 
-    // ============ OpenRouter（备用） ============
-    const val OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/"
-    val OPENROUTER_API_KEY: String get() = String(byteArrayOf(115,107,45,111,114,45,118,49,45,48,97,49,57,54,99,57,56,48,102,50,57,57,102,50,53,48,52,53,49,53,54,56,51,102,54,56,50,49,54,55,101,100,55,56,48,48,55,102,57,56,49,50,102,99,97,48,50,97,50,98,49,52,99,51,53,50,98,48,53,53,56,100,102,52,97,99,48,97,56))
-    const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
+    // ============ Google AI (Gemini) - OpenAI 兼容模式 ============
+    const val GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    val GOOGLE_API_KEY: String get() = String(byteArrayOf(65,81,46,65,98,56,82,78,54,74,100,109,53,50,81,84,88,68,50,49,111,111,85,85,78,102,95,110,73,54,78,71,45,89,102,54,90,114,98,73,55,95,101,121,75,73,79,85,81,54,85,55,119))
+    const val GOOGLE_DEFAULT_MODEL = "gemini-2.0-flash"
+    const val KEY_GOOGLE_API_KEY = "google_api_key"
 
-    // ============ SambaNova API（备用） ============
-    const val SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1/"
-    val SAMBANOVA_API_KEY: String get() = String(byteArrayOf(51,49,99,54,53,49,55,102,45,97,55,54,49,45,52,56,52,101,45,98,55,102,51,45,55,100,56,50,57,56,101,100,50,98,55,49))
-    const val SAMBANOVA_MODEL = "Meta-Llama-3.3-70B-Instruct"
-    const val KEY_SAMBANOVA_API_KEY = "sambanova_api_key"
+    // ============ OpenAI ============
+    const val OPENAI_REAL_BASE_URL = "https://api.openai.com/v1/"
+    const val KEY_OPENAI_API_KEY = "openai_api_key"
 
-    // ============ 视觉模型（OpenRouter 多模态） ============
-    const val VISION_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
+    // ============ Groq ============
+    const val GROQ_BASE_URL = "https://api.groq.com/openai/v1/"
+    const val KEY_GROQ_API_KEY = "groq_api_key"
+
+    // ============ SiliconFlow (硅基流动) ============
+    const val SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1/"
+    const val KEY_SILICONFLOW_API_KEY = "siliconflow_api_key"
+
+    // ============ Moonshot (Kimi) ============
+    const val MOONSHOT_BASE_URL = "https://api.moonshot.cn/v1/"
+    const val KEY_MOONSHOT_API_KEY = "moonshot_api_key"
+
+    // ============ Zhipu AI (智谱) ============
+    const val ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
+    const val KEY_ZHIPU_API_KEY = "zhipu_api_key"
+
+    // ============ 视觉模型 ============
+    const val VISION_MODEL = "gemini-2.0-flash"
 
     val AVAILABLE_MODELS = listOf(
-        // 自动模式（智能路由）
         "auto",
-        // DeepSeek
         "deepseek-chat",
         "deepseek-reasoner",
-        // OpenRouter（备用）
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        // SambaNova（备用）
-        "Meta-Llama-3.3-70B-Instruct"
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "deepseek-ai/DeepSeek-V3",
+        "Qwen/Qwen2.5-72B-Instruct",
+        "moonshot-v1-8k",
+        "moonshot-v1-32k",
+        "glm-4-flash",
+        "glm-4"
     )
 
     const val KEY_AI_MODEL = "ai_model"
@@ -54,7 +76,7 @@ object Constants {
     const val GITHUB_WORKFLOW_ID = "build.yml"
     const val GITHUB_POLL_INTERVAL_MS = 15000L
 
-    const val APP_NAME = "星仔"
-    const val APP_VERSION = "4.9.2"
-    const val APP_VERSION_CODE = 46
+    const val APP_NAME = "布老师"
+    const val APP_VERSION = "5.0.3"
+    const val APP_VERSION_CODE = 53
 }

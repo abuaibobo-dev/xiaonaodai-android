@@ -71,11 +71,27 @@ class AssistantViewModel @Inject constructor(
     // ============ Chat Messages ============
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(ChatMessage(
-            text = "你好！我是星仔 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
+            text = "你好！我是布老师，你的专属AI数字员工 🧠\n\n我能帮你：\n• 软件开发：写代码、改Bug、编译部署\n• 智能问答：聊天、翻译、深度分析\n• 联网搜索：实时信息、新闻、价格\n• 图片分析：识别内容、提取信息\n• 项目管理：创建、修改、迭代项目\n\n💡 有什么想法直接说，我来帮你实现",
             isUser = false
         ))
     )
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    // ============ 对话名称 ============
+    private val _conversationName = MutableStateFlow("新对话")
+    val conversationName: StateFlow<String> = _conversationName.asStateFlow()
+    
+    fun setConversationName(name: String) {
+        _conversationName.value = name
+    }
+    
+    fun autoGenerateConversationName(firstMessage: String) {
+        if (_conversationName.value == "新对话" && firstMessage.isNotBlank()) {
+            val name = if (firstMessage.length > 15) firstMessage.take(15) + "..." else firstMessage
+            _conversationName.value = name
+        }
+    }
+
 
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
@@ -163,7 +179,7 @@ class AssistantViewModel @Inject constructor(
             val savedMessages = chatMessageDao.getRecentMessages(50)
             if (savedMessages.isNotEmpty()) {
                 val welcomeMsg = ChatMessage(
-                    text = "你好！我是星仔 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
+                    text = "你好！我是布老师，你的专属AI数字员工 🧠\n\n我能帮你：\n• 软件开发：写代码、改Bug、编译部署\n• 智能问答：聊天、翻译、深度分析\n• 联网搜索：实时信息、新闻、价格\n• 图片分析：识别内容、提取信息\n• 项目管理：创建、修改、迭代项目\n\n💡 有什么想法直接说，我来帮你实现",
                     isUser = false
                 )
                 val loadedMessages = savedMessages.map { entity ->

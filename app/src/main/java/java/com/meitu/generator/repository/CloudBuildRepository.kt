@@ -116,7 +116,10 @@ class CloudBuildRepository @Inject constructor(
         workflowId: String = Constants.GITHUB_WORKFLOW_ID
     ): Result<Unit> = runCatching {
         val request = WorkflowDispatchRequest(ref = "main")
-        gitHubService.triggerWorkflow(owner, repo, workflowId, request)
+        val response = gitHubService.triggerWorkflow(owner, repo, workflowId, request)
+        if (!response.isSuccessful) {
+            throw IllegalStateException("触发编译失败: HTTP ${response.code()}")
+        }
     }
 
     // ============ 编译状态 ============
@@ -204,6 +207,16 @@ class CloudBuildRepository @Inject constructor(
     suspend fun findApkArtifact(token: String, runId: Long): Result<Artifact?> = runCatching {
         val artifacts = gitHubService.getArtifacts(owner, repo, runId)
         artifacts.artifacts.firstOrNull { !it.expired }
+    }
+
+    /**
+     * 获取编译任务的 jobs 和 steps 详情
+     * @param token GitHub Token
+     * @param runId 运行 ID
+     * @return WorkflowJobsResponse
+     */
+    suspend fun getBuildJobs(token: String, runId: Long): Result<WorkflowJobsResponse> = runCatching {
+        gitHubService.getWorkflowRunJobs(owner, repo, runId)
     }
 
     /**

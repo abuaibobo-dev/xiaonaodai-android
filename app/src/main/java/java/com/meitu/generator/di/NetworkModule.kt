@@ -30,24 +30,11 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-        return OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-    }
-
+    // ============ 加密存储 ============
     @Provides
     @Singleton
     @Named("securePrefs")
-    fun provideEncryptedSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+    fun provideSecurePrefs(@ApplicationContext context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -60,6 +47,7 @@ object NetworkModule {
         )
     }
 
+    // ============ Gson（含自定义序列化器） ============
     @Provides
     @Singleton
     @Named("openaiGson")
@@ -70,11 +58,26 @@ object NetworkModule {
             .create()
     }
 
-    // ============ OpenRouter API（主力） ============
+    // ============ 基础 OkHttpClient ============
     @Provides
     @Singleton
-    @Named("openai")
-    fun provideOpenAIRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+    fun provideOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    // ============ DeepSeek ============
+    @Provides
+    @Singleton
+    @Named("deepseek")
+    fun provideDeepSeekRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
         return Retrofit.Builder()
             .baseUrl(Constants.OPENAI_BASE_URL)
             .client(client)
@@ -84,13 +87,30 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("deepseek")
-    fun provideDeepSeekRetrofit(
-        client: OkHttpClient,
-        @Named("openaiGson") gson: com.google.gson.Gson
-    ): Retrofit {
+    @Named("deepseekService")
+    fun provideDeepSeekService(@Named("deepseek") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ DeepSeek Balance Service ============
+    @Provides
+    @Singleton
+    fun provideDeepSeekBalanceService(client: OkHttpClient): DeepSeekBalanceService {
         return Retrofit.Builder()
-            .baseUrl(com.meitu.generator.util.Constants.OPENAI_BASE_URL)
+            .baseUrl("https://api.deepseek.com/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(DeepSeekBalanceService::class.java)
+    }
+
+    // ============ Google AI (Gemini) ============
+    @Provides
+    @Singleton
+    @Named("google")
+    fun provideGoogleRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.GOOGLE_BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
@@ -98,23 +118,37 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideDeepSeekBalanceService(@Named("deepseek") retrofit: Retrofit): DeepSeekBalanceService {
-        return retrofit.create(DeepSeekBalanceService::class.java)
+    @Named("googleService")
+    fun provideGoogleService(@Named("google") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ OpenAI ============
+    @Provides
+    @Singleton
+    @Named("openai")
+    fun provideOpenAIRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.OPENAI_REAL_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
     }
 
     @Provides
     @Singleton
+    @Named("openaiService")
     fun provideOpenAIService(@Named("openai") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
     }
 
-    // ============ OpenRouter API（显式引用） ============
+    // ============ Groq ============
     @Provides
     @Singleton
-    @Named("openrouter")
-    fun provideOpenRouterRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+    @Named("groq")
+    fun provideGroqRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(Constants.OPENROUTER_BASE_URL)
+            .baseUrl(Constants.GROQ_BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
@@ -122,18 +156,18 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("openrouterService")
-    fun provideOpenRouterService(@Named("openrouter") retrofit: Retrofit): OpenAIService {
+    @Named("groqService")
+    fun provideGroqService(@Named("groq") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
     }
 
-    // ============ SambaNova API（备用） ============
+    // ============ SiliconFlow (硅基流动) ============
     @Provides
     @Singleton
-    @Named("sambanova")
-    fun provideSambaNovaRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+    @Named("siliconflow")
+    fun provideSiliconFlowRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(Constants.SAMBANOVA_BASE_URL)
+            .baseUrl(Constants.SILICONFLOW_BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
@@ -141,15 +175,46 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("sambanovaService")
-    fun provideSambaNovaService(@Named("sambanova") retrofit: Retrofit): OpenAIService {
+    @Named("siliconflowService")
+    fun provideSiliconFlowService(@Named("siliconflow") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ Moonshot (Kimi) ============
+    @Provides
+    @Singleton
+    @Named("moonshot")
+    fun provideMoonshotRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.MOONSHOT_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
     }
 
     @Provides
     @Singleton
-    @Named("deepseekService")
-    fun provideDeepSeekService(@Named("deepseek") retrofit: Retrofit): OpenAIService {
+    @Named("moonshotService")
+    fun provideMoonshotService(@Named("moonshot") retrofit: Retrofit): OpenAIService {
+        return retrofit.create(OpenAIService::class.java)
+    }
+
+    // ============ Zhipu AI (智谱) ============
+    @Provides
+    @Singleton
+    @Named("zhipu")
+    fun provideZhipuRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(Constants.ZHIPU_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("zhipuService")
+    fun provideZhipuService(@Named("zhipu") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
     }
 

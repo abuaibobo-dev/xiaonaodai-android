@@ -25,8 +25,6 @@ class SettingsViewModel @Inject constructor(
     private val privacyModeManager: PrivacyModeManager
 ) : AndroidViewModel(application) {
 
-    init { }
-
     val currentBrainModel: StateFlow<String> = settingsRepo.getStringFlow(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
         .stateIn(viewModelScope, SharingStarted.Lazily, Constants.OPENAI_MODEL)
 
@@ -35,15 +33,27 @@ class SettingsViewModel @Inject constructor(
         emit(saved.ifBlank { Constants.DEFAULT_GITHUB_TOKEN })
     }.stateIn(viewModelScope, SharingStarted.Lazily, Constants.DEFAULT_GITHUB_TOKEN)
 
-    // ============ API Keys（仅保留可用平台） ============
+    // ============ API Keys ============
     private val _deepseekApiKey = MutableStateFlow("")
     val deepseekApiKey: StateFlow<String> = _deepseekApiKey.asStateFlow()
 
-    private val _openrouterApiKey = MutableStateFlow("")
-    val openrouterApiKey: StateFlow<String> = _openrouterApiKey.asStateFlow()
+    private val _googleApiKey = MutableStateFlow("")
+    val googleApiKey: StateFlow<String> = _googleApiKey.asStateFlow()
 
-    private val _sambanovaApiKey = MutableStateFlow("")
-    val sambanovaApiKey: StateFlow<String> = _sambanovaApiKey.asStateFlow()
+    private val _openaiApiKey = MutableStateFlow("")
+    val openaiApiKey: StateFlow<String> = _openaiApiKey.asStateFlow()
+
+    private val _groqApiKey = MutableStateFlow("")
+    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
+
+    private val _siliconflowApiKey = MutableStateFlow("")
+    val siliconflowApiKey: StateFlow<String> = _siliconflowApiKey.asStateFlow()
+
+    private val _moonshotApiKey = MutableStateFlow("")
+    val moonshotApiKey: StateFlow<String> = _moonshotApiKey.asStateFlow()
+
+    private val _zhipuApiKey = MutableStateFlow("")
+    val zhipuApiKey: StateFlow<String> = _zhipuApiKey.asStateFlow()
 
     init {
         refreshApiKeys()
@@ -51,8 +61,12 @@ class SettingsViewModel @Inject constructor(
 
     private fun refreshApiKeys() {
         _deepseekApiKey.value = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
-        _openrouterApiKey.value = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
-        _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
+        _googleApiKey.value = securePrefs.getString(Constants.KEY_GOOGLE_API_KEY, "") ?: ""
+        _openaiApiKey.value = securePrefs.getString(Constants.KEY_OPENAI_API_KEY, "") ?: ""
+        _groqApiKey.value = securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: ""
+        _siliconflowApiKey.value = securePrefs.getString(Constants.KEY_SILICONFLOW_API_KEY, "") ?: ""
+        _moonshotApiKey.value = securePrefs.getString(Constants.KEY_MOONSHOT_API_KEY, "") ?: ""
+        _zhipuApiKey.value = securePrefs.getString(Constants.KEY_ZHIPU_API_KEY, "") ?: ""
     }
 
     private val _showClearConfirm = MutableStateFlow(false)
@@ -77,16 +91,40 @@ class SettingsViewModel @Inject constructor(
         _toastMessage.value = "✅ DeepSeek API Key 已保存"
     }
 
-    fun saveOpenRouterApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_OPENROUTER_API_KEY, key).apply()
-        _openrouterApiKey.value = key
-        _toastMessage.value = "✅ OpenRouter API Key 已保存"
+    fun saveGoogleApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_GOOGLE_API_KEY, key).apply()
+        _googleApiKey.value = key
+        _toastMessage.value = "✅ Google AI API Key 已保存"
     }
 
-    fun saveSambaNovaApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_SAMBANOVA_API_KEY, key).apply()
-        _sambanovaApiKey.value = key
-        _toastMessage.value = "✅ SambaNova API Key 已保存"
+    fun saveOpenAIApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_OPENAI_API_KEY, key).apply()
+        _openaiApiKey.value = key
+        _toastMessage.value = "✅ OpenAI API Key 已保存"
+    }
+
+    fun saveGroqApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_GROQ_API_KEY, key).apply()
+        _groqApiKey.value = key
+        _toastMessage.value = "✅ Groq API Key 已保存"
+    }
+
+    fun saveSiliconFlowApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_SILICONFLOW_API_KEY, key).apply()
+        _siliconflowApiKey.value = key
+        _toastMessage.value = "✅ 硅基流动 API Key 已保存"
+    }
+
+    fun saveMoonshotApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_MOONSHOT_API_KEY, key).apply()
+        _moonshotApiKey.value = key
+        _toastMessage.value = "✅ Moonshot API Key 已保存"
+    }
+
+    fun saveZhipuApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_ZHIPU_API_KEY, key).apply()
+        _zhipuApiKey.value = key
+        _toastMessage.value = "✅ 智谱AI API Key 已保存"
     }
 
     fun clearCache() {

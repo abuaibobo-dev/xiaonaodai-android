@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -51,6 +53,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        // 启用 edge-to-edge，让 IME 键盘正确处理
+        androidx.activity.enableEdgeToEdge()
         setContent {
             MeituTheme(darkTheme = true) {
                 MainScreen()
@@ -70,7 +74,7 @@ val drawerItems = listOf(
     DrawerItem(Routes.ASSISTANT, Icons.Outlined.Chat, "对话"),
     DrawerItem(Routes.PROJECTS, Icons.Outlined.Folder, "项目"),
     DrawerItem(Routes.CLOUD_BUILD, Icons.Outlined.Build, "编译"),
-    DrawerItem(Routes.SETTINGS, Icons.Outlined.Settings, "设置")
+    // 设置已移至头像菜单
 )
 
 @Composable
@@ -84,13 +88,15 @@ fun MainScreen() {
     // 用于顶栏余额显示（与 AssistantScreen 共享 ViewModel 实例）
     val assistantViewModel: AssistantViewModel = hiltViewModel()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
         // ============ 主内容区域 ============
         Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
             // ============ 极简顶栏 ============
+            val conversationName by assistantViewModel.conversationName.collectAsState()
             TopAppBar(
                 navController = navController,
                 currentRoute = currentRoute,
+                conversationName = conversationName,
                 onMenuClick = { drawerOpen = true },
                 onNewChat = {
                     scope.launch {
@@ -159,6 +165,7 @@ fun MainScreen() {
 private fun TopAppBar(
     navController: androidx.navigation.NavHostController,
     currentRoute: String?,
+    conversationName: String,
     onMenuClick: () -> Unit,
     onNewChat: () -> Unit,
     onClearChat: () -> Unit
@@ -220,13 +227,15 @@ private fun TopAppBar(
                     }
                 }
 
-                // 标题
+                // 标题 - 显示当前对话名称
                 Text(
-                    "星仔",
+                    conversationName,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.textPrimary,
-                    modifier = Modifier.weight(1f).padding(start = 8.dp)
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 // 右侧：状态指示点 + 更多菜单（仅对话页显示）
@@ -367,6 +376,7 @@ private fun SidebarDrawer(
             .fillMaxHeight()
             .width(280.dp)
             .background(colors.background)
+            .statusBarsPadding()
     ) {
         Column(
             modifier = Modifier
@@ -375,7 +385,7 @@ private fun SidebarDrawer(
         ) {
             // ============ 顶部: App名称 ============
             Text(
-                "星仔",
+                "布老师",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary
@@ -447,55 +457,6 @@ private fun SidebarDrawer(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.Bottom
             ) {
-                // ============ 余额显示区 ============
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text("💰", fontSize = 14.sp)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "账户余额",
-                        fontSize = 12.sp,
-                        color = colors.textSecondary
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        "¥${balance.totalBalance}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if ((balance.totalBalance.toFloatOrNull() ?: 0f) < 0) colors.error else colors.accent
-                    )
-                }
-                // 一键查询用量
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(colors.accent.copy(alpha = 0.08f))
-                        .clickable {
-                            try {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://platform.deepseek.com/usage"))
-                                ctx.startActivity(intent)
-                            } catch (_: Exception) {}
-                        }
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    Text("🌐", fontSize = 12.sp)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "查询用量明细",
-                        fontSize = 12.sp,
-                        color = colors.accent,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text("›", fontSize = 14.sp, color = colors.accent)
-                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -503,24 +464,148 @@ private fun SidebarDrawer(
                         .background(colors.border)
                 )
                 Spacer(Modifier.height(12.dp))
+                
+                // 头像 + 点击弹出菜单
+                var showAvatarMenu by remember { mutableStateOf(false) }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // 用户头像
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(colors.surface),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("\uD83E\uDDE0", fontSize = 16.sp)
+                    Box {
+                        // 用户头像（可点击）
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(colors.surface)
+                                .clickable { showAvatarMenu = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("\uD83E\uDDE0", fontSize = 16.sp)
+                        }
+                        
+                        // 头像菜单
+                        DropdownMenu(
+                            expanded = showAvatarMenu,
+                            onDismissRequest = { showAvatarMenu = false },
+                            modifier = Modifier.background(colors.surface)
+                        ) {
+                            // 余额显示
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("💰", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("账户余额", fontSize = 14.sp, color = colors.textPrimary)
+                                        Spacer(Modifier.weight(1f))
+                                        Text(
+                                            "¥${balance.totalBalance}",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if ((balance.totalBalance.toFloatOrNull() ?: 0f) < 0) colors.error else colors.accent
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://platform.deepseek.com/usage"))
+                                        ctx.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            )
+                            
+                            // 分隔线
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp)
+                                    .height(0.5.dp)
+                                    .background(colors.border)
+                            )
+                            
+                            // AI Key 配置
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🔑", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("AI Key 配置", fontSize = 14.sp, color = colors.textPrimary)
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    onNavigate(Routes.SETTINGS)
+                                }
+                            )
+                            
+                            // 系统设置
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("⚙️", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("系统设置", fontSize = 14.sp, color = colors.textPrimary)
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    onNavigate(Routes.SETTINGS)
+                                }
+                            )
+                            
+                            // 关于
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("ℹ️", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("关于", fontSize = 14.sp, color = colors.textPrimary)
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    onNavigate(Routes.SETTINGS)
+                                }
+                            )
+                            
+                            // 分隔线
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp)
+                                    .height(0.5.dp)
+                                    .background(colors.border)
+                            )
+                            
+                            // DeepSeek 官网
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🌐", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("DeepSeek 官网", fontSize = 14.sp, color = colors.textPrimary)
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://platform.deepseek.com"))
+                                        ctx.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                            )
+                        }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            "星仔",
+                            "布老师",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = colors.textPrimary

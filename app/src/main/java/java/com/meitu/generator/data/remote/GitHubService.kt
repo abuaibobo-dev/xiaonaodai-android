@@ -2,6 +2,7 @@ package com.meitu.generator.data.remote
 
 import com.meitu.generator.data.remote.dto.*
 import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.*
 
 /**
@@ -51,7 +52,7 @@ interface GitHubService {
         @Path("repo") repo: String,
         @Path("workflow_id") workflowId: String,
         @Body request: WorkflowDispatchRequest
-    ): Unit
+    ): Response<Unit>
 
     /**
      * 获取 workflow 运行列表
@@ -88,6 +89,19 @@ interface GitHubService {
         @Path("repo") repo: String,
         @Path("run_id") runId: Long
     ): WorkflowRun
+
+    // ============ Workflow Jobs API ============
+
+    /**
+     * 获取 workflow run 的 jobs 列表
+     * GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
+     */
+    @GET("repos/{owner}/{repo}/actions/runs/{run_id}/jobs")
+    suspend fun getWorkflowRunJobs(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("run_id") runId: Long
+    ): WorkflowJobsResponse
 
     // ============ Artifacts API ============
 

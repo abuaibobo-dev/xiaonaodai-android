@@ -20,6 +20,11 @@ class ProjectViewModel @Inject constructor(
     val tasks: StateFlow<List<TaskEntity>> = taskDao.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    fun clearToast() { _toastMessage.value = null }
+
     fun getStatusText(status: Int): String = when (status) {
         0 -> "进行中"
         1 -> "已完成"
@@ -28,9 +33,13 @@ class ProjectViewModel @Inject constructor(
     }
 
     fun getStatusColor(status: Int): Color = when (status) {
-        0 -> Color(0xFFCC9933)   // Warning/进行中 - 香槟金近似
-        1 -> Color(0xFF339933)   // Success/已完成
-        2 -> Color(0xFF999999)   // Tertiary/已取消
+        0 -> Color(0xFFCC9933)
+        1 -> Color(0xFF339933)
+        2 -> Color(0xFF999999)
         else -> Color(0xFF999999)
+    }
+
+    fun showNewProjectDialog() {
+        _toastMessage.value = "在对话中输入需求，AI 会自动创建项目"
     }
 }

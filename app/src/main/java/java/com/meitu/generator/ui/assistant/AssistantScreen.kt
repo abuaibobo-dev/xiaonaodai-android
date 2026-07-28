@@ -28,6 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -214,80 +218,122 @@ fun AssistantScreen(
     ) { uri: Uri? -> uri?.let { viewModel.setPendingImage(it.toString()) } }
 
     val lastMessageId = messages.lastOrNull()?.id
-    LaunchedEffect(lastMessageId, isLoading) {
+    val lastMessageText = messages.lastOrNull()?.text
+    val lastMessageLen = lastMessageText?.length ?: 0
+    
+    // 综合滚动触发器：消息变化、状态变化、内容更新都触发滚动
+    val scrollTrigger by remember {
+        derivedStateOf {
+            Triple(lastMessageId, isLoading, lastMessageLen)
+        }
+    }
+    
+    LaunchedEffect(scrollTrigger) {
         if (messages.isNotEmpty()) {
-            delay(100)
-            val targetIndex = (messages.size - 1 + (if (isLoading) 1 else 0)).coerceIn(0, messages.size + 2)
-            try { listState.scrollToItem(index = targetIndex, scrollOffset = 0) } catch (_: Exception) {}
+            delay(80)
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                try { listState.animateScrollToItem(totalItems - 1, scrollOffset = 0) } catch (_: Exception) {}
+            }
+        }
+    }
+    
+    // agentStatus 变化时也滚动
+    LaunchedEffect(agentStatus) {
+        if (agentStatus != null && messages.isNotEmpty()) {
             delay(50)
-            try { listState.animateScrollToItem(index = targetIndex, scrollOffset = 0) } catch (_: Exception) {}
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                try { listState.animateScrollToItem(totalItems - 1, scrollOffset = 0) } catch (_: Exception) {}
+            }
+        }
+    }
+    
+    // 思维链更新时也滚动
+    LaunchedEffect(thinkingChain) {
+        if (isThinkingActive && messages.isNotEmpty()) {
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                try { listState.animateScrollToItem(totalItems - 1, scrollOffset = 0) } catch (_: Exception) {}
+            }
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
-        // 消息列表 + 滚动到底部浮动按钮
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (messages.size <= 1 && !isLoading) { item { EmptyState(onSendQuickAction = { text -> viewModel.setInput(text) }) } }
+    // 判断是否为空对话（用于布局切换）
+    val isEmptyConversation = (messages.isEmpty() || (messages.size <= 1 && messages.all { it.isSystem })) && !isLoading
 
-                items(messages, key = { it.id }) { msg ->
-                    when {
-                        msg.isSystem -> SystemMessageBubble(msg.text)
-                        msg.taskProgress != null -> TaskProgressBubble(msg)
-                        else -> TextMessageBubble(msg, animatedMessageIds, viewModel)
+    Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
+        if (isEmptyConversation) {
+            // ============ 空对话：居中布局 ============
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                EmptyState()
+            }
+        } else {
+            // ============ 有消息：正常列表布局 ============
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(messages, key = { it.id }) { msg ->
+                        when {
+                            msg.isSystem -> SystemMessageBubble(msg.text)
+                            msg.taskProgress != null -> TaskProgressBubble(msg)
+                            else -> TextMessageBubble(msg, animatedMessageIds, viewModel)
+                        }
+                    }
+
+                    if (agentStatus != null) {
+                        item { AgentStatusBubble(status = agentStatus!!) }
+                    }
+
+                    if (isLoading && agentStatus == null) {
+                        item { ThinkingChainIndicator(thinkingChain = thinkingChain, isActive = isThinkingActive) }
+                    }
+
+                    item { Spacer(Modifier.height(8.dp)) }
+                }
+
+                // 滚动到底部浮动按钮
+                val canScrollDown by remember {
+                    derivedStateOf {
+                        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                        val totalItems = listState.layoutInfo.totalItemsCount
+                        lastVisible < totalItems - 2
                     }
                 }
-
-                if (agentStatus != null) {
-                    item { AgentStatusBubble(status = agentStatus!!) }
-                }
-
-                if (isLoading && agentStatus == null) {
-                    item { ThinkingChainIndicator(thinkingChain = thinkingChain, isActive = isThinkingActive) }
-                }
-
-                item { Spacer(Modifier.height(8.dp)) }
-            }
-
-            // 滚动到底部浮动按钮
-            val canScrollDown by remember {
-                derivedStateOf {
-                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                    val totalItems = listState.layoutInfo.totalItemsCount
-                    lastVisible < totalItems - 2
-                }
-            }
-            if (canScrollDown) {
-                val coroutineScope = rememberCoroutineScope()
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 8.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(colors.surface.copy(alpha = 0.85f))
-                        .border(0.5.dp, colors.border, CircleShape)
-                        .clickable {
-                            coroutineScope.launch {
-                                try {
-                                    val lastIndex = listState.layoutInfo.totalItemsCount - 1
-                                    listState.animateScrollToItem(lastIndex)
-                                } catch (_: Exception) {}
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = "滚动到底部",
-                        tint = colors.textSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                if (canScrollDown) {
+                    val coroutineScope = rememberCoroutineScope()
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 8.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(colors.surface.copy(alpha = 0.85f))
+                            .border(0.5.dp, colors.border, CircleShape)
+                            .clickable {
+                                coroutineScope.launch {
+                                    try {
+                                        val lastIndex = listState.layoutInfo.totalItemsCount - 1
+                                        listState.animateScrollToItem(lastIndex)
+                                    } catch (_: Exception) {}
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = "滚动到底部",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -302,7 +348,8 @@ fun AssistantScreen(
         val availableBrainModels = viewModel.availableBrainModels
         var showModelDropdown by remember { mutableStateOf(false) }
 
-        SmartInputBar(
+        Box(modifier = Modifier.imePadding()) {
+            SmartInputBar(
             inputText = inputText,
             isLoading = isLoading,
             pendingImageUri = pendingImageUri,
@@ -321,7 +368,8 @@ fun AssistantScreen(
                 viewModel.switchBrainModel(model)
                 showModelDropdown = false
             }
-        )
+            )
+        }
     }
 
     // P0修复：错误提示 Snackbar（不混入聊天流）
@@ -397,84 +445,39 @@ private fun SmartModeChip(
 
 // ============ 空状态 ============
 @Composable
-private fun EmptyState(onSendQuickAction: (String) -> Unit = {}) {
+private fun EmptyState() {
     val colors = LocalAppColors.current
 
-    data class QuickAction(val icon: String, val label: String, val prompt: String)
-
-    val quickActions = listOf(
-        QuickAction("💻", "帮我写代码", "帮我写一个Kotlin函数，实现"),
-        QuickAction("🐛", "修复Bug", "我有一个Bug需要修复，问题是"),
-        QuickAction("⚙️", "编译APK", "帮我编译项目并生成APK"),
-        QuickAction("📖", "解释代码", "请帮我解释以下代码的作用："),
-        QuickAction("🎨", "优化UI", "帮我优化界面设计，当前问题是"),
-        QuickAction("🔍", "代码审查", "请帮我审查这段代码，检查潜在问题：")
-    )
-
     Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 品牌标识区
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Logo
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(colors.accent, colors.accent.copy(alpha = 0.7f))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Text("🧠", fontSize = 48.sp)
-                Text("星仔", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-                Text("你的AI编程助手", fontSize = 14.sp, color = colors.textTertiary)
+                Text("⭐", fontSize = 28.sp)
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // 引导卡片
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(colors.surface)
-                    .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("快捷开始", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textSecondary)
+            Text("布老师", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Text("你的AI编程助手", fontSize = 14.sp, color = colors.textTertiary)
 
-                // 快捷操作网格 (2列)
-                val rows = quickActions.chunked(2)
-                rows.forEach { rowActions ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        rowActions.forEach { action ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colors.background)
-                                    .border(0.5.dp, colors.border, RoundedCornerShape(12.dp))
-                                    .clickable { onSendQuickAction(action.prompt) }
-                                    .padding(vertical = 12.dp, horizontal = 10.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(action.icon, fontSize = 18.sp)
-                                    Text(action.label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                                    Text(action.prompt.take(20) + "…", fontSize = 10.sp, color = colors.textTertiary, maxLines = 1)
-                                }
-                            }
-                        }
-                        if (rowActions.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
+            Spacer(Modifier.height(24.dp))
 
-            // 底部提示
             Text("所有对话都会被记忆，我会越用越懂你 💡", fontSize = 12.sp, color = colors.textTertiary)
         }
     }
@@ -501,41 +504,45 @@ private fun SmartInputBar(
 ) {
     val colors = LocalAppColors.current
     val canSend = (inputText.isNotBlank() || pendingImageUri != null) && !isLoading
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column {
+            // 顶部分割线
             Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
 
-            // 输入区域主体 - 统一的输入框
+            // 输入区域主体
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(colors.background)
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                // 统一输入框容器（包含文本+所有控件）
+                // 输入框主体 - 圆角卡片
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(colors.surface)
-                        .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
+                        .border(0.5.dp, colors.border, RoundedCornerShape(20.dp))
                 ) {
                     Column {
-                        // 文本输入区域（更高）
+                        // 文本输入区域 - 自适应高度
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 72.dp, max = 160.dp)
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .heightIn(min = 44.dp, max = 140.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             androidx.compose.foundation.text.BasicTextField(
                                 value = inputText,
                                 onValueChange = onInputChange,
                                 textStyle = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 15.sp, color = colors.textPrimary, lineHeight = 22.sp
+                                    fontSize = 15.sp,
+                                    color = colors.textPrimary,
+                                    lineHeight = 22.sp
                                 ),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                                 cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
                                 decorationBox = { innerTextField ->
                                     Box {
@@ -543,7 +550,9 @@ private fun SmartInputBar(
                                             androidx.compose.foundation.text.BasicText(
                                                 text = "说点什么...",
                                                 style = androidx.compose.ui.text.TextStyle(
-                                                    fontSize = 15.sp, color = colors.textTertiary, lineHeight = 22.sp
+                                                    fontSize = 15.sp,
+                                                    color = colors.textTertiary,
+                                                    lineHeight = 22.sp
                                                 )
                                             )
                                         }
@@ -553,88 +562,76 @@ private fun SmartInputBar(
                             )
                         }
 
-                        // 分割线
+                        // 底部分割线（仅在输入框内）
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp)
                                 .height(0.5.dp)
-                                .background(colors.border.copy(alpha = 0.5f))
+                                .background(colors.border.copy(alpha = 0.4f))
                         )
 
-                        // 底部工具栏（所有控件在这一行）
+                        // 底部工具栏
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左侧：模型选择 + 功能chips + 图片
+                            // 左侧工具按钮
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 模型选择器
+                                // 模型选择
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(colors.background)
-                                        .border(0.5.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .clip(RoundedCornerShape(8.dp))
                                         .clickable { onToggleModelDropdown() }
-                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🤖", fontSize = 11.sp)
-                                        Spacer(Modifier.width(4.dp))
+                                        Text("🤖", fontSize = 13.sp)
+                                        Spacer(Modifier.width(3.dp))
                                         Text(
                                             com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(currentModel),
-                                            fontSize = 10.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = colors.textSecondary,
                                             maxLines = 1
                                         )
-                                        Spacer(Modifier.width(2.dp))
-                                        Text("▾", fontSize = 9.sp, color = colors.textTertiary)
+                                        Text(" ▾", fontSize = 10.sp, color = colors.textTertiary)
                                     }
                                 }
 
+                                // 思考模式
                                 SmartModeChip(
-                                    icon = "🧠",
-                                    label = "思考",
-                                    active = deepThinking,
-                                    activeColor = Color(0xFF6C5CE7),
-                                    onClick = onToggleDeepThinking
+                                    icon = "🧠", label = "思考", active = deepThinking,
+                                    activeColor = Color(0xFF6C5CE7), onClick = onToggleDeepThinking
                                 )
+                                // 联网搜索
                                 SmartModeChip(
-                                    icon = "🌐",
-                                    label = "搜索",
-                                    active = webSearch,
-                                    activeColor = Color(0xFF00B894),
-                                    onClick = onToggleWebSearch
+                                    icon = "🌐", label = "搜索", active = webSearch,
+                                    activeColor = Color(0xFF00B894), onClick = onToggleWebSearch
                                 )
-                                // 附件按钮（别针图标）
+                                // 附件
                                 Box(
                                     modifier = Modifier
                                         .size(28.dp)
                                         .clip(CircleShape)
-                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
-                                        .border(0.5.dp, if (pendingImageUri != null) colors.accent.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.5f), CircleShape)
+                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
                                         .clickable { onPickImage() },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        "📎",
-                                        fontSize = 14.sp,
-                                        color = if (pendingImageUri != null) colors.accent else colors.textTertiary
-                                    )
+                                    Text("📎", fontSize = 14.sp)
                                 }
                             }
 
-                            // 右侧：发送按钮
+                            // 右侧发送按钮
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
+                                    .size(32.dp)
                                     .clip(CircleShape)
                                     .background(if (canSend) colors.accent else colors.border.copy(alpha = 0.3f))
                                     .clickable(enabled = canSend) { onSend() },
@@ -644,7 +641,7 @@ private fun SmartInputBar(
                                     Icons.Default.Send,
                                     contentDescription = "发送",
                                     tint = if (canSend) Color.White else colors.textTertiary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
                         }
@@ -658,7 +655,7 @@ private fun SmartInputBar(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 20.dp, top = 100.dp)
+                    .padding(start = 16.dp, top = 80.dp)
             ) {
                 DropdownMenu(
                     expanded = showModelDropdown,
@@ -669,7 +666,11 @@ private fun SmartInputBar(
                         DropdownMenuItem(
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(model), fontSize = 14.sp, color = colors.textPrimary)
+                                    Text(
+                                        com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(model),
+                                        fontSize = 14.sp,
+                                        color = colors.textPrimary
+                                    )
                                     if (model == currentModel) {
                                         Spacer(Modifier.width(8.dp))
                                         Text("✓", fontSize = 14.sp, color = colors.accent, fontWeight = FontWeight.Bold)
@@ -866,6 +867,29 @@ private fun TextMessageBubble(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                
+                // AI消息的复制按钮
+                if (!msg.isUser && !msg.isSystem && visibleTextLength >= fullTextLength) {
+                    val context = LocalContext.current
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("message", msg.text)
+                                    clipboard.setPrimaryClip(clip)
+                                    android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(4.dp)
+                        ) {
+                            Text("📋 复制", fontSize = 11.sp, color = colors.textTertiary)
                         }
                     }
                 }

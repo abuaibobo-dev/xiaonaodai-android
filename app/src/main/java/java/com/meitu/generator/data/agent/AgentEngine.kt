@@ -24,7 +24,7 @@ import javax.inject.Singleton
 
 /**
  * ReAct 循环引擎 - v4.8.0
- * 主力：DeepSeek Chat/Reasoner，备用：OpenRouter + SambaNova
+ * 主力：DeepSeek Chat/Reasoner，备选：Google Gemini
  */
 @Singleton
 class AgentEngine @Inject constructor(
@@ -33,9 +33,13 @@ class AgentEngine @Inject constructor(
     private val skillRegistry: SkillRegistry,
     private val agentMemory: AgentMemory,
     private val openAIService: OpenAIService,
-    @Named("sambanovaService") private val sambanovaService: OpenAIService,
     @Named("deepseekService") private val deepseekService: OpenAIService,
-    @Named("openrouterService") private val openrouterService: OpenAIService,
+    @Named("googleService") private val googleService: OpenAIService,
+    @Named("openaiService") private val openaiRealService: OpenAIService,
+    @Named("groqService") private val groqService: OpenAIService,
+    @Named("siliconflowService") private val siliconflowService: OpenAIService,
+    @Named("moonshotService") private val moonshotService: OpenAIService,
+    @Named("zhipuService") private val zhipuService: OpenAIService,
     private val planDao: PlanDao,
     private val semanticCache: SemanticCache,
     private val memoryCompressor: MemoryCompressor,
@@ -54,16 +58,46 @@ class AgentEngine @Inject constructor(
             "deepseek-chat", "deepseek-reasoner"
         )
 
-        /** SambaNova 模型集合 */
-        private val SAMBANOVA_MODELS = setOf(
-            "Meta-Llama-3.3-70B-Instruct"
+        /** Google Gemini 模型集合 */
+        val GOOGLE_MODELS = setOf(
+            "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"
+        )
+
+        /** OpenAI 模型集合 */
+        val OPENAI_MODELS = setOf(
+            "gpt-4o", "gpt-4o-mini"
+        )
+
+        /** Groq 模型集合 */
+        val GROQ_MODELS = setOf(
+            "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
+        )
+
+        /** SiliconFlow (硅基流动) 模型集合 */
+        val SILICONFLOW_MODELS = setOf(
+            "deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"
+        )
+
+        /** Moonshot (Kimi) 模型集合 */
+        val MOONSHOT_MODELS = setOf(
+            "moonshot-v1-8k", "moonshot-v1-32k"
+        )
+
+        /** Zhipu AI (智谱) 模型集合 */
+        val ZHIPU_MODELS = setOf(
+            "glm-4-flash", "glm-4"
         )
 
         /** 模型名 → 所属平台映射 */
         fun getModelPlatform(model: String): String = when {
             DEEPSEEK_MODELS.contains(model) -> "deepseek"
-            SAMBANOVA_MODELS.contains(model) -> "sambanova"
-            else -> "openrouter" // 默认走 OpenRouter
+            GOOGLE_MODELS.contains(model) -> "google"
+            OPENAI_MODELS.contains(model) -> "openai"
+            GROQ_MODELS.contains(model) -> "groq"
+            SILICONFLOW_MODELS.contains(model) -> "siliconflow"
+            MOONSHOT_MODELS.contains(model) -> "moonshot"
+            ZHIPU_MODELS.contains(model) -> "zhipu"
+            else -> "deepseek" // 默认走 DeepSeek
         }
     }
 
@@ -81,20 +115,76 @@ class AgentEngine @Inject constructor(
     }
 
 
+    private fun getGoogleApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_GOOGLE_API_KEY, "") ?: ""
+        return if (savedKey.isNotBlank()) savedKey else Constants.GOOGLE_API_KEY
+    }
+
     private fun getDeepSeekApiKey(): String {
         val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
         return if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
     }
 
-    private fun getOpenRouterApiKey(): String {
-        val savedKey = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
-        return if (savedKey.isNotBlank()) savedKey else Constants.OPENROUTER_API_KEY
+    private fun getOpenAIApiKey(): String {
+        return securePrefs.getString(Constants.KEY_OPENAI_API_KEY, "") ?: ""
     }
 
-    private fun getSambaNovaApiKey(): String {
-        val savedKey = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "")
-        return if (savedKey.isNullOrBlank()) Constants.SAMBANOVA_API_KEY else savedKey
+    private fun getGroqApiKey(): String {
+        return securePrefs.getString(Constants.KEY_GROQ_API_KEY, "") ?: ""
     }
+
+    private fun getSiliconFlowApiKey(): String {
+        return securePrefs.getString(Constants.KEY_SILICONFLOW_API_KEY, "") ?: ""
+    }
+
+    private fun getMoonshotApiKey(): String {
+        return securePrefs.getString(Constants.KEY_MOONSHOT_API_KEY, "") ?: ""
+    }
+
+    private fun getZhipuApiKey(): String {
+        return securePrefs.getString(Constants.KEY_ZHIPU_API_KEY, "") ?: ""
+    }
+
+    /**
+     * 根据平台获取 API Key，如果未配置则返回 null（调用方回退到 DeepSeek）
+     */
+    private fun getApiKeyForPlatform(platform: String): String? {
+        val key = when (platform) {
+            "deepseek" -> getDeepSeekApiKey()
+            "google" -> getGoogleApiKey()
+            "openai" -> getOpenAIApiKey()
+            "groq" -> getGroqApiKey()
+            "siliconflow" -> getSiliconFlowApiKey()
+            "moonshot" -> getMoonshotApiKey()
+            "zhipu" -> getZhipuApiKey()
+            else -> getDeepSeekApiKey()
+        }
+        return key.ifBlank { null }
+    }
+
+    /**
+     * 根据 platform 获取对应 Service，如果 Key 未配置则回退到 DeepSeek
+     */
+    private fun getServiceForPlatform(platform: String): Pair<OpenAIService, String> {
+        val apiKey = getApiKeyForPlatform(platform)
+        if (apiKey != null) {
+            val service = when (platform) {
+                "deepseek" -> deepseekService
+                "google" -> googleService
+                "openai" -> openaiRealService
+                "groq" -> groqService
+                "siliconflow" -> siliconflowService
+                "moonshot" -> moonshotService
+                "zhipu" -> zhipuService
+                else -> deepseekService
+            }
+            return Pair(service, "Bearer $apiKey")
+        }
+        // Key 未配置，回退到 DeepSeek
+        return Pair(deepseekService, "Bearer ${getDeepSeekApiKey()}")
+    }
+
+
 
     fun classifyIntent(query: String): IntentRouter.IntentResult {
         return IntentRouter.classify(query)
@@ -235,11 +325,9 @@ class AgentEngine @Inject constructor(
                 )
 
                 // 根据模型名路由到正确的 service
-                val response = when (getModelPlatform(model)) {
-                    "deepseek" -> deepseekService.chatCompletions(request, "Bearer ${getDeepSeekApiKey()}")
-                    "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
-                    else -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
-                }
+                val platform = getModelPlatform(model)
+                val (service, authHeader) = getServiceForPlatform(platform)
+                val response = service.chatCompletions(request, authHeader)
 
                 TokenEstimator.account(request.toString(), response.toString())
 
@@ -294,17 +382,7 @@ class AgentEngine @Inject constructor(
 
             } catch (e: Exception) {
                 val errMsg = e.message ?: ""
-                // 降级：OpenRouter → SambaNova
-                if (errMsg.contains("402") || errMsg.contains("429") || errMsg.contains("quota") ||
-                    errMsg.contains("insufficient") || errMsg.contains("balance") || errMsg.contains("rate")) {
-                    reportStatus("⚠️ 服务暂时不可用，正在切换备用通道...")
-                    // 尝试 SambaNova
-                    val snResult = callSambaNova(query, imageBase64, imageMimeType)
-                    if (!snResult.startsWith("[SambaNova 错误]") && !snResult.startsWith("[SambaNova 调用失败]")) {
-                        return snResult
-                    }
-                    return "[ERROR] 所有备用模型均不可用，请稍后重试"
-                }
+                // 限流：等待后重试
                 if (errMsg.contains("429")) {
                     delay(3000L)
                     if (cycleCount >= MAX_REACT_CYCLES) {
@@ -312,55 +390,17 @@ class AgentEngine @Inject constructor(
                     }
                     continue
                 }
+                // 服务不可用或配额耗尽
+                if (errMsg.contains("402") || errMsg.contains("quota") ||
+                    errMsg.contains("insufficient") || errMsg.contains("balance")) {
+                    reportStatus("⚠️ 服务暂时不可用")
+                    return "[ERROR] 模型服务暂不可用，请稍后重试或切换模型"
+                }
                 return "[引擎异常] ${errMsg.take(100).ifBlank { "未知错误" }}"
             }
         }
 
         return lastAssistantText.ifBlank { "[已达到最大推理轮次(${MAX_REACT_CYCLES})，结果可能不完整]" }
-    }
-
-    /** 调用 SambaNova 备用模型 */
-    private suspend fun callSambaNova(query: String, imageBase64: String?, imageMimeType: String?): String {
-        val apiKey = getSambaNovaApiKey()
-        if (apiKey.isBlank()) return "[SambaNova 调用失败] 未配置 API Key"
-        try {
-            val messages = mutableListOf<OpenAIMessage>()
-            val memoryPrompt = agentMemory.buildMemoryPrompt()
-            messages.add(OpenAIMessage(role = "system", content = "你是「布老师」AI 智能体助手，请用中文回复用户。当前记忆：$memoryPrompt"))
-
-            if (imageBase64 != null) {
-                val mime = imageMimeType ?: "image/jpeg"
-                val textContent = if (query.isBlank()) "请分析这张图片" else query
-                messages.add(OpenAIMessage(
-                    role = "user",
-                    contentParts = listOf(
-                        ContentPart(type = "text", text = textContent),
-                        ContentPart(type = "image_url", image_url = ImageUrl(url = "data:$mime;base64,$imageBase64"))
-                    )
-                ))
-            } else {
-                messages.add(OpenAIMessage(role = "user", content = query))
-            }
-
-            val request = OpenAIRequest(
-                model = Constants.SAMBANOVA_MODEL,
-                messages = messages,
-                temperature = 0.7,
-                max_tokens = 4096
-            )
-
-            val response = sambanovaService.chatCompletions(request, "Bearer $apiKey")
-
-            if (response.error != null) {
-                return "[SambaNova 错误] ${response.error.message ?: "未知错误"}"
-            }
-
-            val choice = response.choices?.firstOrNull()
-            val content = choice?.message?.content
-            return content ?: "[SambaNova 返回为空]"
-        } catch (e: Exception) {
-            return "[SambaNova 调用失败] ${e.message?.take(100) ?: "未知错误"}"
-        }
     }
 
     private fun tryExtractToolCall(content: String): Pair<String, Map<String, Any>>? {
@@ -406,11 +446,9 @@ class AgentEngine @Inject constructor(
                 max_tokens = 500
             )
             val model = Constants.OPENAI_MODEL
-            val response = when (getModelPlatform(model)) {
-                "deepseek" -> deepseekService.chatCompletions(request, "Bearer ${getDeepSeekApiKey()}")
-                "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
-                else -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
-            }
+            val planPlatform = getModelPlatform(model)
+            val (planService, planAuth) = getServiceForPlatform(planPlatform)
+            val response = planService.chatCompletions(request, planAuth)
             val text = response.choices?.firstOrNull()?.message?.content?.trim() ?: return null
 
             if (text == "null" || text.contains("\"null\"")) return null
@@ -543,7 +581,9 @@ ${results.joinToString("\n")}
         val enabledTools = toolRegistry.getAll().map { "${it.name}: ${it.description}" }
         val sb = StringBuilder()
 
-        sb.appendLine("你是「布老师」v4.8.0 AI 智能体引擎，一个纯AI智能体助手。")
+        sb.appendLine("你是「布老师」，用户的专属AI数字员工，具备完整软件工程能力。")
+        sb.appendLine("核心特质：专业但不机械、主动但不啰嗦、谨慎但不拖沓、有温度但不油腻。")
+        sb.appendLine()
         sb.appendLine("拥有以下工具能力：")
         sb.appendLine(enabledTools.joinToString("\n"))
         sb.appendLine()
@@ -587,11 +627,26 @@ ${results.joinToString("\n")}
         sb.appendLine("用户记忆：")
         sb.appendLine(memoryPrompt)
         sb.appendLine()
-        sb.appendLine("规则：")
-        sb.appendLine("1. 需要使用工具时，返回 JSON：{\"tool\":\"工具名\",\"args\":{参数}}")
+        sb.appendLine("【工作流程 - 按意图分类执行】")
+        sb.appendLine("1. 明确任务（\"帮我做\"\"生成\"\"写一个\"\"创建\"\"编译\"\"部署\"）→ 立即执行，不反问、不拖延")
+        sb.appendLine("2. 模糊需求（\"想做个\"\"打算做\"\"考虑做\"或描述不完整）→ 先问2-3个关键问题 → 给建议方案 → 等用户确认 → 再执行")
+        sb.appendLine("3. 日常对话（问候/闲聊/咨询）→ 直接回答，不调用工具")
+        sb.appendLine("4. 修改迭代（\"给那个XX加个YY\"\"把XX改成YY\"）→ 从记忆检索上下文 → 修改 → 验证 → 交付")
+        sb.appendLine("5. 诊断查询（\"检查状态\"\"看看哪里有问题\"）→ 运行诊断 → 生成报告 → 标注问题 → 自动修复可修复项")
+        sb.appendLine()
+        sb.appendLine("【行为规范】")
+        sb.appendLine("1. 模糊需求不要立即执行，先问清楚再动手")
+        sb.appendLine("2. 问问题不超过3个，不要让用户填问卷")
+        sb.appendLine("3. 提供方案时给出明确建议，不让用户做选择题")
+        sb.appendLine("4. 明确需求直接干，不反复确认")
+        sb.appendLine("5. 记住用户历史偏好，下次自动应用")
+        sb.appendLine("6. 错误提示说人话，不说技术术语")
+        sb.appendLine()
+        sb.appendLine("【工具调用规则】")
+        sb.appendLine("1. 需要工具时，返回 JSON：{\"tool\":\"工具名\",\"args\":{参数}}")
         sb.appendLine("2. 可以连续调用多个工具")
         sb.appendLine("3. 用中文回复用户")
-        sb.appendLine("4. 如果不需要工具，直接回答即可")
+        sb.appendLine("4. 简洁直接，不啰嗦，不堆砌废话")
 
         return sb.toString()
     }

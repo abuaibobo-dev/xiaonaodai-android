@@ -110,7 +110,7 @@ fun CloudBuildScreen(
                     buildState = buildState,
                     onStartBuild = {
                         viewModel.startBuild(mapOf(
-                            "README.md" to "# 星仔 App - Auto Build\nBuilt from 星仔 App"
+                            "README.md" to "# 布老师 App - Auto Build\nBuilt from 布老师 App"
                         ))
                     },
                     onCheckStatus = { viewModel.checkStatus() },

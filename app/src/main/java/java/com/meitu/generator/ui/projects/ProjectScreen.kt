@@ -11,6 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,6 +30,14 @@ fun ProjectScreen(
 ) {
     val colors = LocalAppColors.current
     val tasks by viewModel.tasks.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+
+    LaunchedEffect(toastMessage) {
+        if (toastMessage != null) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearToast()
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(colors.background)
@@ -40,6 +51,7 @@ fun ProjectScreen(
             modifier = Modifier.padding(horizontal = Spacing.PagePadding, vertical = 16.dp)
         )
 
+        Box(modifier = Modifier.fillMaxSize()) {
         if (tasks.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -48,7 +60,7 @@ fun ProjectScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("暂无项目", fontSize = 16.sp, color = colors.textSecondary)
                     Spacer(Modifier.height(4.dp))
-                    Text("在对话中让AI帮你创建项目", fontSize = 14.sp, color = colors.textSecondary)
+                    Text("点击右下角按钮创建新项目", fontSize = 14.sp, color = colors.textSecondary)
                 }
             }
         } else {
@@ -66,6 +78,35 @@ fun ProjectScreen(
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
+        }
+
+        // 新建项目按钮
+        FloatingActionButton(
+            onClick = { viewModel.showNewProjectDialog() },
+            containerColor = colors.accent,
+            contentColor = Color.White,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "新建项目", modifier = Modifier.size(28.dp))
+        }
+
+        // Toast 提示
+        if (toastMessage != null) {
+            Box(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.accent.copy(alpha = 0.9f))
+                        .padding(12.dp)
+                ) {
+                    Text(toastMessage ?: "", fontSize = 14.sp, color = Color.White)
+                }
+            }
+        }
         }
     }
 }
