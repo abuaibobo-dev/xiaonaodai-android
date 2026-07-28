@@ -79,7 +79,13 @@ class CloudBuildRepository @Inject constructor(
         var failCount = 0
         val errors = mutableListOf<String>()
 
-        projectFiles.entries.forEach { (path, content) ->
+        projectFiles.entries.forEach { (originalPath, content) ->
+            // 将用户生成的代码路径重定向到 user-project 模块
+            val path = if (originalPath.startsWith("app/")) {
+                "user-project/$originalPath"
+            } else {
+                originalPath
+            }
             val result = pushFile(path, content, token = token)
             if (result.isSuccess) {
                 successCount++
@@ -120,7 +126,18 @@ class CloudBuildRepository @Inject constructor(
      * @param token GitHub Token
      * @return 最新的 WorkflowRun 或 null
      */
+    // 用户项目构建使用的 workflow 文件名
+    private val userProjectWorkflowId = "user-project-build.yml"
+
     suspend fun getLatestRun(token: String): Result<WorkflowRun?> = runCatching {
+        // 优先获取用户项目构建 workflow 的运行
+        try {
+            val runs = gitHubService.getWorkflowRunsByWorkflowId(owner, repo, userProjectWorkflowId, perPage = 1)
+            val userRun = runs.workflowRuns.firstOrNull()
+            if (userRun != null) return@runCatching userRun
+        } catch (_: Exception) {
+            // 用户项目 workflow 可能不存在，回退到通用查询
+        }
         val runs = gitHubService.getWorkflowRuns(owner, repo, perPage = 1)
         runs.workflowRuns.firstOrNull()
     }
@@ -277,7 +294,7 @@ class CloudBuildRepository @Inject constructor(
     suspend fun getBuildErrorLog(token: String, runId: Long): String? {
         return try {
             val artifacts = gitHubService.getArtifacts(owner, repo, runId)
-            val errorLog = artifacts.artifacts.firstOrNull { it.name == "build-error-log" }
+            val errorLog = artifacts.artifacts.firstOrNull { it.name == "user-build-error-log" || it.name == "build-error-log" }
             if (errorLog != null) {
                 val client = okhttp3.OkHttpClient.Builder()
                     .followRedirects(true)

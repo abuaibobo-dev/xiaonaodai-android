@@ -47,6 +47,15 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
+
+    // 排除用户生成的代码（在 user-project 模块中独立编译）
+    sourceSets {
+        getByName("main") {
+            java {
+                exclude("**/com/example/**")
+            }
+        }
+    }
 }
 
 dependencies {
