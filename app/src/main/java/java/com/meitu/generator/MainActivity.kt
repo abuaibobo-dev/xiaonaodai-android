@@ -190,12 +190,10 @@ private fun TopAppBar(
                                 .size(20.dp)
                                 .drawBehind {
                                     val strokeW = 1.8.dp.toPx()
-                                    val lineLen = size.width
-                                    val gap = size.height * 0.3f
+                                    val lineLen = size.width * 0.65f
                                     val y1 = size.height * 0.2f
                                     val y2 = size.height * 0.5f
                                     val y3 = size.height * 0.8f
-                                    val half = strokeW / 2f
                                     drawLine(
                                         color = colors.textPrimary,
                                         start = Offset(0f, y1),

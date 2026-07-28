@@ -66,6 +66,19 @@ interface GitHubService {
     ): WorkflowRunList
 
     /**
+     * 获取指定 workflow 的运行列表
+     * GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs
+     */
+    @GET("repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs")
+    suspend fun getWorkflowRunsByWorkflowId(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("workflow_id") workflowId: String,
+        @Query("per_page") perPage: Int = 10,
+        @Query("page") page: Int = 1
+    ): WorkflowRunList
+
+    /**
      * 获取单次 workflow 运行详情
      * GET /repos/{owner}/{repo}/actions/runs/{run_id}
      */
@@ -99,5 +112,5 @@ interface GitHubService {
         @Path("owner") owner: String,
         @Path("repo") repo: String,
         @Path("artifact_id") artifactId: Long
-    ): Unit
+    ): ResponseBody
 }
