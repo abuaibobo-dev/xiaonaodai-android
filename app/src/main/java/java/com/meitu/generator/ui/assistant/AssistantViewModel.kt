@@ -17,6 +17,8 @@ import com.meitu.generator.data.remote.dto.OpenAIMessage
 import com.meitu.generator.data.remote.dto.OpenAIRequest
 import com.meitu.generator.data.tools.BuildProgress
 import com.meitu.generator.data.tools.BuildProgressCallback
+import com.meitu.generator.data.local.dao.ChatMessageDao
+import com.meitu.generator.data.local.entity.ChatMessageEntity
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -62,13 +64,14 @@ class AssistantViewModel @Inject constructor(
     private val openAIService: OpenAIService,
     private val agentEngine: AgentEngine,
     @Named("securePrefs") private val securePrefs: SharedPreferences,
-    private val deepSeekBalanceService: DeepSeekBalanceService
+    private val deepSeekBalanceService: DeepSeekBalanceService,
+    private val chatMessageDao: ChatMessageDao
 ) : AndroidViewModel(application) {
 
     // ============ Chat Messages ============
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(ChatMessage(
-            text = "你好！我是布老师 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
+            text = "你好！我是星仔 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
             isUser = false
         ))
     )
@@ -148,6 +151,44 @@ class AssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedModel = settingsRepo.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
             _currentModel.value = savedModel
+            loadMessagesFromDb()
+        }
+    }
+
+    /**
+     * 从数据库加载历史对话记录
+     */
+    private suspend fun loadMessagesFromDb() {
+        try {
+            val savedMessages = chatMessageDao.getRecentMessages(50)
+            if (savedMessages.isNotEmpty()) {
+                val welcomeMsg = ChatMessage(
+                    text = "你好！我是星仔 AI 智能体 🧠\n\n我可以帮你：\n• 聊天问答、写代码、翻译\n• 深度思考复杂问题\n• 联网搜索最新信息\n• 分析你发来的图片\n• 生成和修改项目\n• 云端编译 APK\n\n💡 试试输入框下方的模式切换！",
+                    isUser = false
+                )
+                val loadedMessages = savedMessages.map { entity ->
+                    ChatMessage(
+                        id = entity.id,
+                        text = entity.text,
+                        isUser = entity.isUser,
+                        imageUri = entity.imageUri,
+                        reasoningContent = entity.reasoningContent,
+                        timestamp = entity.timestamp
+                    )
+                }
+                _messages.value = listOf(welcomeMsg) + loadedMessages
+
+                // 恢复 conversationHistory（最近10轮对话）
+                conversationHistory.clear()
+                savedMessages.takeLast(20).forEach { entity ->
+                    conversationHistory.add(OpenAIMessage(
+                        role = if (entity.isUser) "user" else "assistant",
+                        content = entity.text
+                    ))
+                }
+            }
+        } catch (e: Exception) {
+            // 加载失败不影响使用，静默处理
         }
     }
 
@@ -215,6 +256,18 @@ class AssistantViewModel @Inject constructor(
         )
         _messages.value = (_messages.value + userMsg).takeLast(100)
         _isLoading.value = true
+
+        // 保存用户消息到数据库
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                chatMessageDao.insert(ChatMessageEntity(
+                    text = userMsg.text,
+                    isUser = true,
+                    imageUri = userMsg.imageUri,
+                    timestamp = userMsg.timestamp
+                ))
+            } catch (_: Exception) {}
+        }
 
         val hasImage = imageUri != null
         val deepThinking = _deepThinkingEnabled.value
@@ -372,6 +425,18 @@ class AssistantViewModel @Inject constructor(
                     )).takeLast(100)
                 }
 
+                // 保存AI回复到数据库
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        chatMessageDao.insert(ChatMessageEntity(
+                            text = response,
+                            isUser = false,
+                            reasoningContent = reasoning,
+                            timestamp = System.currentTimeMillis()
+                        ))
+                    } catch (_: Exception) {}
+                }
+
                 conversationHistory.add(OpenAIMessage(role = "assistant", content = response))
                 if (conversationHistory.size > 20) {
                     conversationHistory.removeAt(0)
@@ -423,5 +488,10 @@ class AssistantViewModel @Inject constructor(
             isUser = false
         ))
         conversationHistory.clear()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                chatMessageDao.deleteAll()
+            } catch (_: Exception) {}
+        }
     }
 }

@@ -54,7 +54,7 @@ object Constants {
     const val GITHUB_WORKFLOW_ID = "build.yml"
     const val GITHUB_POLL_INTERVAL_MS = 15000L
 
-    const val APP_NAME = "布老师"
-    const val APP_VERSION = "4.9.1"
-    const val APP_VERSION_CODE = 45
+    const val APP_NAME = "星仔"
+    const val APP_VERSION = "4.9.2"
+    const val APP_VERSION_CODE = 46
 }

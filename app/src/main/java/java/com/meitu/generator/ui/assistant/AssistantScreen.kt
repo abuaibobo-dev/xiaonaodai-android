@@ -425,7 +425,7 @@ private fun EmptyState(onSendQuickAction: (String) -> Unit = {}) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("🧠", fontSize = 48.sp)
-                Text("布老师", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Text("星仔", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                 Text("你的AI编程助手", fontSize = 14.sp, color = colors.textTertiary)
             }
 

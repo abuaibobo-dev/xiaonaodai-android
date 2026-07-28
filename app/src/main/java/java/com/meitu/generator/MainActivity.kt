@@ -224,7 +224,7 @@ private fun TopAppBar(
 
                 // 标题
                 Text(
-                    "布老师",
+                    "星仔",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.textPrimary,
@@ -377,7 +377,7 @@ private fun SidebarDrawer(
         ) {
             // ============ 顶部: App名称 ============
             Text(
-                "布老师",
+                "星仔",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary
@@ -522,7 +522,7 @@ private fun SidebarDrawer(
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            "布老师",
+                            "星仔",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = colors.textPrimary

@@ -2,13 +2,14 @@ package com.meitu.generator.data.local.dao
 
 import androidx.room.*
 import com.meitu.generator.data.local.entity.ChatMessageEntity
-import kotlinx.coroutines.flow.Flow
 
-/**
- * 聊天消息 DAO
- */
 @Dao
 interface ChatMessageDao {
+    @Query("SELECT * FROM chat_messages WHERE isSystem = 0 ORDER BY timestamp ASC")
+    suspend fun getAllMessages(): List<ChatMessageEntity>
+
+    @Query("SELECT * FROM chat_messages WHERE isSystem = 0 ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentMessages(limit: Int = 50): List<ChatMessageEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: ChatMessageEntity): Long
@@ -16,12 +17,6 @@ interface ChatMessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(messages: List<ChatMessageEntity>): List<Long>
 
-    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
-    fun getAll(): Flow<List<ChatMessageEntity>>
-
     @Query("DELETE FROM chat_messages")
     suspend fun deleteAll()
-
-    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC LIMIT :limit")
-    suspend fun getRecent(limit: Int): List<ChatMessageEntity>
 }

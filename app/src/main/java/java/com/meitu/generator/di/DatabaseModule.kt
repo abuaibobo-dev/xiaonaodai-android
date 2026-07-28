@@ -4,9 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.meitu.generator.data.local.AppDatabase
 import com.meitu.generator.data.local.dao.*
-import com.meitu.generator.data.evermemory.BM25Retriever
-import com.meitu.generator.data.evermemory.SimpleEmbedder
-import com.meitu.generator.data.evermemory.SemanticClusterer
 import com.meitu.generator.util.Constants
 import dagger.Module
 import dagger.Provides
@@ -35,20 +32,4 @@ object DatabaseModule {
     @Provides fun provideMemoryDao(db: AppDatabase): MemoryDao = db.memoryDao()
     @Provides fun providePlanDao(db: AppDatabase): PlanDao = db.planDao()
     @Provides fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
-    @Provides fun provideEverMemoryDao(db: AppDatabase): EverMemoryDao = db.everMemoryDao()
-
-    // ============ EverOS 语义记忆系统依赖 ============
-
-    @Provides
-    @Singleton
-    fun provideBM25Retriever(): BM25Retriever = BM25Retriever()
-
-    @Provides
-    @Singleton
-    fun provideSimpleEmbedder(): SimpleEmbedder = SimpleEmbedder()
-
-    @Provides
-    @Singleton
-    fun provideSemanticClusterer(embedder: SimpleEmbedder): SemanticClusterer =
-        SemanticClusterer(embedder)
 }

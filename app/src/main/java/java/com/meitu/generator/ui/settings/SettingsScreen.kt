@@ -218,7 +218,7 @@ fun SettingsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("布老师", fontSize = 17.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                        Text("星仔", fontSize = 17.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
                         Spacer(Modifier.height(4.dp))
                         Text("v${Constants.APP_VERSION}", fontSize = 13.sp, color = colors.textTertiary)
                     }
