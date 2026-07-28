@@ -83,37 +83,16 @@ class DeveloperTool @Inject constructor(
             appendLine("1. 必须以 package com.example.app 开头")
             appendLine("2. 禁止使用 @AndroidEntryPoint 或任何 Hilt/Dagger 注解")
             appendLine("3. 类必须继承 androidx.activity.ComponentActivity，不要任何注解")
-            appendLine("4. 必须在 package 之后、class 之前写出所有 import，每个 import 独占一行")
-            appendLine("5. 常用 import（必须按需用到的都写上）：")
-            appendLine("   import android.os.Bundle")
-            appendLine("   import androidx.activity.ComponentActivity")
-            appendLine("   import androidx.activity.compose.setContent")
-            appendLine("   import androidx.compose.runtime.Composable")
-            appendLine("   import androidx.compose.runtime.getValue")
-            appendLine("   import androidx.compose.runtime.setValue")
-            appendLine("   import androidx.compose.runtime.mutableStateOf")
-            appendLine("   import androidx.compose.runtime.remember")
-            appendLine("   import androidx.compose.runtime.LaunchedEffect")
-            appendLine("   import androidx.compose.ui.Modifier")
-            appendLine("   import androidx.compose.ui.unit.dp")
-            appendLine("   import androidx.compose.ui.unit.sp")
-            appendLine("   import androidx.compose.ui.graphics.Color")
-            appendLine("   import androidx.compose.ui.Alignment")
-            appendLine("   import androidx.compose.material3.MaterialTheme")
-            appendLine("   import androidx.compose.material3.Text")
-            appendLine("   import androidx.compose.foundation.layout.*")
-            appendLine("   import kotlinx.coroutines.delay")
-            appendLine("6. 只要使用了 Text、Box、Column、Row、Button、Image、Spacer、fillMaxSize、padding、size、offset、background、clickable 等，必须 import 对应的包")
-            appendLine("7. 不要使用任何项目中不存在的第三方库（禁止 Hilt、禁止 Room、禁止 Retrofit）")
-            appendLine("8. 不要使用 android.R 的资源")
+            appendLine("4. 不要写任何 import 语句（系统会自动注入完整的 import 列表）")
+            appendLine("5. 不要使用任何项目中不存在的第三方库（禁止 Hilt、禁止 Room、禁止 Retrofit、禁止 Coil）")
+            appendLine("6. 不要使用 android.R 的资源")
+            appendLine("7. 只使用 Jetpack Compose 标准组件（Material3、Foundation、Animation 等）")
+            appendLine("8. 如需使用协程相关功能（delay、launch 等），直接调用即可，import 由系统处理")
             appendLine()
             appendLine("=== 文件结构模板 ===")
             appendLine("package com.example.app")
             appendLine()
-            appendLine("import android.os.Bundle")
-            appendLine("import androidx.activity.ComponentActivity")
-            appendLine("import androidx.activity.compose.setContent")
-            appendLine("// ... 其他所有需要的 import ...")
+            appendLine("// 不需要写 import，系统自动注入")
             appendLine()
             appendLine("class MainActivity : ComponentActivity() {")
             appendLine("    override fun onCreate(savedInstanceState: Bundle?) {")
@@ -126,7 +105,7 @@ class DeveloperTool @Inject constructor(
             appendLine("    }")
             appendLine("}")
             appendLine()
-            appendLine("只输出完整 Kotlin 代码（包含 package + 所有 import + 完整实现），不要任何解释。")
+            appendLine("只输出完整 Kotlin 代码（包含 package + 完整实现，不含 import），不要任何解释。")
             appendLine("```kotlin")
             appendLine("// 完整代码")
             appendLine("```")
@@ -241,14 +220,17 @@ class DeveloperTool @Inject constructor(
         fixed = fixed.replace("""@Inject\s*\n""".toRegex(), "")
         fixed = fixed.replace("""@HiltAndroidApp\s*\n""".toRegex(), "")
         
-        // Check if imports exist
-        val hasImports = fixed.lines().any { it.trimStart().startsWith("import ") }
-        val hasPackage = fixed.lines().any { it.trimStart().startsWith("package ") }
+        val lines = fixed.lines().toMutableList()
         
-        if (!hasImports) {
-            // Inject comprehensive common imports after package declaration
-            val fallbackImports = """
-import android.os.Bundle
+        // Find package line
+        val packageIdx = lines.indexOfFirst { it.trimStart().startsWith("package ") }
+        val packageLine = if (packageIdx >= 0) lines[packageIdx] else "package com.example.app"
+        
+        // Remove all existing import lines (AI-generated imports are often wrong)
+        val codeLines = lines.filter { !it.trimStart().startsWith("import ") }
+        
+        // Rebuild: package + blank line + comprehensive imports + blank line + code body
+        val header = """import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
@@ -257,87 +239,188 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Badge
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.ModalDrawer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Popup
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.Chip
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.repeatable
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.Constraints
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.random.Random
-""".trimIndent()
-            
-            if (hasPackage) {
-                val lines = fixed.lines().toMutableList()
-                val packageIdx = lines.indexOfFirst { it.trimStart().startsWith("package ") }
-                if (packageIdx >= 0) {
-                    lines.add(packageIdx + 1, "")
-                    lines.add(packageIdx + 2, fallbackImports)
-                    fixed = lines.joinToString("\n")
-                }
-            } else {
-                fixed = "package com.example.app\n\n$fallbackImports\n\n$fixed"
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import kotlin.random.Random"""
+        
+        // Find where code body starts (after package line)
+        val bodyStartIdx = if (packageIdx >= 0) packageIdx + 1 else 0
+        val bodyLines = codeLines.drop(bodyStartIdx).dropWhile { it.isBlank() }
+        
+        fixed = buildString {
+            appendLine(packageLine)
+            appendLine()
+            appendLine(header)
+            appendLine()
+            bodyLines.forEachIndexed { index, line ->
+                append(line)
+                if (index < bodyLines.size - 1) appendLine()
             }
         }
         
