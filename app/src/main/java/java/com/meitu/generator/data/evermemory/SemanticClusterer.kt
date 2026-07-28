@@ -80,7 +80,7 @@ class SemanticClusterer @Inject constructor(
             title = title,
             description = memCell.episode.take(200),
             centroidEmbedding = embedder.floatsToBytes(cellEmbedding),
-            cellIds = "["${memCell.id}"]",
+            cellIds = "[\"${memCell.id}\"]",
             createdAt = System.currentTimeMillis()
         )
     }
@@ -115,7 +115,7 @@ class SemanticClusterer @Inject constructor(
         if (!existingIds.contains(memCell.id)) {
             existingIds.add(memCell.id)
         }
-        val newCellIdsJson = existingIds.joinToString(",", prefix = "["", postfix = ""]")
+        val newCellIdsJson = existingIds.joinToString(",", prefix = "[\"", postfix = "\"]")
 
         return scene.copy(
             centroidEmbedding = embedder.floatsToBytes(normalizedCentroid),
@@ -142,7 +142,7 @@ class SemanticClusterer @Inject constructor(
         // 简单解析：["id1","id2","id3"]
         return json.removePrefix("[").removeSuffix("]")
             .split(",")
-            .map { it.trim().removeSurrounding(""") }
+            .map { it.trim().removeSurrounding("\"") }
             .filter { it.isNotBlank() }
     }
 

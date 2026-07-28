@@ -68,7 +68,7 @@ class EverMemoryRepository @Inject constructor(
         val embedding = embedder.embed(episode)
 
         // 2. 构建 JSON 字段
-        val factsJson = facts.joinToString(",", prefix = "["", postfix = ""]") { it.replace(""", "\"") }
+        val factsJson = facts.joinToString(",", prefix = "[\"", postfix = "\"]") { it.replace("\"", "\\\"") }
         val foresightJson = if (foresight != null) {
             buildForesightJson(foresight)
         } else {
@@ -76,9 +76,9 @@ class EverMemoryRepository @Inject constructor(
         }
         val metadataJson = buildString {
             append("{")
-            append(""timestamp":$now,")
-            append(""source":"agent_interaction",")
-            append(""fact_count":${facts.size}")
+            append("\"timestamp\":$now,")
+            append("\"source\":\"agent_interaction\",")
+            append("\"fact_count\":${facts.size}")
             append("}")
         }
 
@@ -286,12 +286,12 @@ class EverMemoryRepository @Inject constructor(
         val sb = StringBuilder("{")
         val entries = foresight.entries.toList()
         entries.forEachIndexed { index, (key, value) ->
-            sb.append(""$key":")
+            sb.append("\"$key\":")
             when (value) {
-                is String -> sb.append(""$value"")
+                is String -> sb.append("\"$value\"")
                 is Number -> sb.append(value)
                 is Boolean -> sb.append(value)
-                else -> sb.append(""$value"")
+                else -> sb.append("\"$value\"")
             }
             if (index < entries.size - 1) sb.append(",")
         }
@@ -305,7 +305,7 @@ class EverMemoryRepository @Inject constructor(
     private fun parseJsonArray(json: String): List<String> {
         return json.removePrefix("[").removeSuffix("]")
             .split(",")
-            .map { it.trim().removeSurrounding(""").replace("\"", """) }
+            .map { it.trim().removeSurrounding("\"").replace("\\\"", "\"") }
             .filter { it.isNotBlank() }
     }
 }
