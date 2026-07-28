@@ -10,11 +10,6 @@ import com.meitu.generator.data.local.entity.PlanEntity
 import com.meitu.generator.data.model.AgentMessage
 import com.meitu.generator.data.model.ToolContext
 import com.meitu.generator.data.remote.OpenAIService
-import com.meitu.generator.data.remote.GeminiService
-import com.meitu.generator.data.remote.dto.GeminiRequest
-import com.meitu.generator.data.remote.dto.GeminiContent
-import com.meitu.generator.data.remote.dto.GeminiPart
-import com.meitu.generator.data.remote.dto.GeminiInlineData
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.data.tools.BuildProgressCallback
 import com.meitu.generator.data.tools.CloudBuildTool
@@ -29,7 +24,7 @@ import javax.inject.Singleton
 
 /**
  * ReAct 循环引擎 - v4.8.0
- * 仅使用已验证可用的免费模型：OpenRouter（主力） + SambaNova（备用）
+ * 主力：DeepSeek Chat/Reasoner，备用：OpenRouter + SambaNova
  */
 @Singleton
 class AgentEngine @Inject constructor(
@@ -40,7 +35,6 @@ class AgentEngine @Inject constructor(
     private val openAIService: OpenAIService,
     @Named("sambanovaService") private val sambanovaService: OpenAIService,
     @Named("deepseekService") private val deepseekService: OpenAIService,
-    private val geminiService: GeminiService,
     @Named("openrouterService") private val openrouterService: OpenAIService,
     private val planDao: PlanDao,
     private val semanticCache: SemanticCache,
@@ -55,17 +49,19 @@ class AgentEngine @Inject constructor(
     companion object {
         const val MAX_REACT_CYCLES = 5
 
-        /** 模型名 → 所属平台映射 */
-        private val SAMBANOVA_MODELS = setOf(
-            "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b",
-            "DeepSeek-V3.1", "gemma-4-31B-it"
+        /** DeepSeek 模型集合 */
+        private val DEEPSEEK_MODELS = setOf(
+            "deepseek-chat", "deepseek-reasoner"
         )
-        private val DEEPSEEK_MODELS = setOf("deepseek-chat")
-        private val GEMINI_MODELS = setOf("gemini-2.0-flash")
 
+        /** SambaNova 模型集合 */
+        private val SAMBANOVA_MODELS = setOf(
+            "Meta-Llama-3.3-70B-Instruct"
+        )
+
+        /** 模型名 → 所属平台映射 */
         fun getModelPlatform(model: String): String = when {
             DEEPSEEK_MODELS.contains(model) -> "deepseek"
-            GEMINI_MODELS.contains(model) -> "gemini"
             SAMBANOVA_MODELS.contains(model) -> "sambanova"
             else -> "openrouter" // 默认走 OpenRouter
         }
@@ -84,6 +80,12 @@ class AgentEngine @Inject constructor(
         thinkingCallback?.invoke(content)
     }
 
+
+    private fun getDeepSeekApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
+        return if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
+    }
+
     private fun getOpenRouterApiKey(): String {
         val savedKey = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
         return if (savedKey.isNotBlank()) savedKey else Constants.OPENROUTER_API_KEY
@@ -92,32 +94,6 @@ class AgentEngine @Inject constructor(
     private fun getSambaNovaApiKey(): String {
         val savedKey = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "")
         return if (savedKey.isNullOrBlank()) Constants.SAMBANOVA_API_KEY else savedKey
-    }
-
-    private fun getDeepSeekApiKey(): String {
-        val savedKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "")
-        return if (savedKey.isNullOrBlank()) Constants.DEEPSEEK_API_KEY else savedKey
-    }
-
-    private fun getGeminiApiKey(): String {
-        val savedKey = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "")
-        return if (savedKey.isNullOrBlank()) Constants.GEMINI_API_KEY else savedKey
-    }
-
-    /**
-     * 记录各平台 token 使用量到 SharedPreferences
-     */
-    private fun recordTokenUsage(platform: String, inputChars: Int, outputChars: Int) {
-        val prefs = appContext.getSharedPreferences("token_usage", Context.MODE_PRIVATE)
-        val inputKey = "${platform}_input_chars"
-        val outputKey = "${platform}_output_chars"
-        val totalInput = prefs.getInt(inputKey, 0) + inputChars
-        val totalOutput = prefs.getInt(outputKey, 0) + outputChars
-        prefs.edit()
-            .putInt(inputKey, totalInput)
-            .putInt(outputKey, totalOutput)
-            .putLong("last_used_${platform}", System.currentTimeMillis())
-            .apply()
     }
 
     fun classifyIntent(query: String): IntentRouter.IntentResult {
@@ -132,7 +108,8 @@ class AgentEngine @Inject constructor(
         statusCallback: ((String) -> Unit)? = null,
         deepThinkingEnabled: Boolean = false,
         webSearchEnabled: Boolean = false,
-        thinkingCallback: ((String) -> Unit)? = null
+        thinkingCallback: ((String) -> Unit)? = null,
+        conversationHistory: List<OpenAIMessage> = emptyList()
     ): String {
         CloudBuildTool.progressCallback.set(buildProgressCallback)
         this.statusCallback = statusCallback
@@ -162,7 +139,7 @@ class AgentEngine @Inject constructor(
                 if (plan != null) {
                     executeWithPlan(plan, q, imageBase64, imageMimeType)
                 } else {
-                    reactLoop(q, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage)
+                    reactLoop(q, imageBase64, imageMimeType, effectiveModel, webSearchEnabled, hasImage, conversationHistory)
                 }
             }
         }
@@ -188,7 +165,7 @@ class AgentEngine @Inject constructor(
         )
         preferenceLearner.analyzeAndLearn()
 
-        CloudBuildTool.progressCallback.remove()
+        CloudBuildTool.progressCallback.set(null)
         this.statusCallback = null
         this.thinkingCallback = null
 
@@ -212,13 +189,19 @@ class AgentEngine @Inject constructor(
         imageMimeType: String? = null,
         model: String = Constants.OPENAI_MODEL,
         webSearchEnabled: Boolean = false,
-        hasImage: Boolean = false
+        hasImage: Boolean = false,
+        conversationHistory: List<OpenAIMessage> = emptyList()
     ): String {
         val messages = mutableListOf<OpenAIMessage>()
         val memoryPrompt = agentMemory.buildMemoryPrompt()
         val systemText = buildSystemPrompt(memoryPrompt, model, webSearchEnabled, hasImage)
 
         messages.add(OpenAIMessage(role = "system", content = systemText))
+
+        // Insert conversation history for multi-turn context
+        for (msg in conversationHistory) {
+            messages.add(msg)
+        }
 
         if (imageBase64 != null) {
             val mime = imageMimeType ?: "image/jpeg"
@@ -252,113 +235,12 @@ class AgentEngine @Inject constructor(
                 )
 
                 // 根据模型名路由到正确的 service
-                val platform = getModelPlatform(model)
-                if (platform == "gemini") {
-                    // Gemini 使用独立 API 格式
-                    val geminiMessages = mutableListOf<GeminiPart>()
-                    val systemParts = mutableListOf<GeminiPart>()
-                    systemParts.add(GeminiPart(text = systemText))
-                    
-                    for (msg in messages) {
-                        if (msg.role == "system") {
-                            systemParts.add(GeminiPart(text = msg.content ?: ""))
-                        }
-                    }
-                    
-                    // 构建 Gemini contents（跳过 system messages）
-                    val geminiContents = mutableListOf<GeminiContent>()
-                    for (msg in messages) {
-                        if (msg.role == "system") continue
-                        val role = if (msg.role == "assistant") "model" else "user"
-                        val parts = mutableListOf<GeminiPart>()
-                        if (msg.contentParts != null) {
-                            for (cp in msg.contentParts) {
-                                if (cp.type == "text" && cp.text != null) {
-                                    parts.add(GeminiPart(text = cp.text))
-                                } else if (cp.type == "image_url" && cp.image_url != null) {
-                                    val base64Data = cp.image_url.url.substringAfter("base64,")
-                                    parts.add(GeminiPart(inlineData = GeminiInlineData(
-                                        mime_type = imageMimeType ?: "image/jpeg",
-                                        data = base64Data
-                                    )))
-                                }
-                            }
-                        } else if (msg.content != null) {
-                            parts.add(GeminiPart(text = msg.content))
-                        }
-                        if (parts.isNotEmpty()) {
-                            geminiContents.add(GeminiContent(parts = parts))
-                        }
-                    }
-                    
-                    val geminiRequest = GeminiRequest(
-                        contents = geminiContents,
-                        systemInstruction = if (systemParts.isNotEmpty()) GeminiContent(parts = systemParts) else null
-                    )
-                    
-                    val geminiResponse = geminiService.generateContent(
-                        model = model,
-                        apiKey = getGeminiApiKey(),
-                        request = geminiRequest
-                    )
-                    
-                    // 记录 token 使用量
-                    recordTokenUsage("gemini", request.toString().length, geminiResponse.toString().length)
-                    
-                    if (geminiResponse.error != null) {
-                        return "[Gemini 错误] ${geminiResponse.error.message ?: "未知错误"}"
-                    }
-                    
-                    val geminiContent = geminiResponse.candidates?.firstOrNull()?.content
-                    val geminiText = geminiContent?.parts?.firstOrNull { it.text != null }?.text
-                    if (geminiText == null) break
-                    lastAssistantText = geminiText
-                    
-                    // 检查工具调用（同 OpenAI 格式处理）
-                    val toolCallResult = tryExtractToolCall(geminiText)
-                    if (toolCallResult != null) {
-                        val (toolName, args) = toolCallResult
-                        val permError = PermissionInterceptor.check(appContext, toolName)
-                        if (permError != null) {
-                            messages.add(OpenAIMessage(role = "assistant", content = geminiText))
-                            messages.add(OpenAIMessage(role = "user", content = "工具调用结果: $permError"))
-                            continue
-                        }
-                        reportStatus("🔧 正在处理...")
-                        val tool = toolRegistry.get(toolName)
-                        val toolResult = if (tool != null) {
-                            try {
-                                val provider = circuitBreaker.getAvailableProvider(toolName)
-                                val ctx = ToolContext(applicationContext = appContext)
-                                val output = tool.execute(args, ctx)
-                                circuitBreaker.reportSuccess(provider)
-                                val reflection = Reflection.validate(toolName, output)
-                                if (reflection.needsRetry) {
-                                    "[工具${toolName}结果异常: ${reflection.reason}]，原始: ${output.take(200)}"
-                                } else output
-                            } catch (e: Exception) {
-                                val provider = circuitBreaker.getAvailableProvider(toolName)
-                                circuitBreaker.reportFailure(provider)
-                                Reflection.handleToolError(toolName, e)
-                            }
-                        } else "工具 $toolName 未注册"
-                        messages.add(OpenAIMessage(role = "assistant", content = geminiText))
-                        messages.add(OpenAIMessage(role = "user", content = "工具 [$toolName] 执行结果：\n$toolResult\n\n请根据结果继续处理，或给出最终回复。"))
-                        continue
-                    }
-                    
-                    return geminiText
-                }
-                
-                // OpenAI 兼容格式（DeepSeek / OpenRouter / SambaNova）
-                val response = when (platform) {
+                val response = when (getModelPlatform(model)) {
                     "deepseek" -> deepseekService.chatCompletions(request, "Bearer ${getDeepSeekApiKey()}")
                     "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
                     else -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
                 }
 
-                // 记录 token 使用量
-                recordTokenUsage(platform, request.toString().length, response.toString().length)
                 TokenEstimator.account(request.toString(), response.toString())
 
                 if (response.error != null) {
@@ -523,10 +405,12 @@ class AgentEngine @Inject constructor(
                 temperature = 0.3,
                 max_tokens = 500
             )
-            val response = openrouterService.chatCompletions(
-                request = request,
-                authorization = "Bearer ${getOpenRouterApiKey()}"
-            )
+            val model = Constants.OPENAI_MODEL
+            val response = when (getModelPlatform(model)) {
+                "deepseek" -> deepseekService.chatCompletions(request, "Bearer ${getDeepSeekApiKey()}")
+                "sambanova" -> sambanovaService.chatCompletions(request, "Bearer ${getSambaNovaApiKey()}")
+                else -> openrouterService.chatCompletions(request, "Bearer ${getOpenRouterApiKey()}")
+            }
             val text = response.choices?.firstOrNull()?.message?.content?.trim() ?: return null
 
             if (text == "null" || text.contains("\"null\"")) return null

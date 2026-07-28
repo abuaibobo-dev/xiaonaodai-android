@@ -33,6 +33,7 @@ fun SettingsScreen(
 ) {
     val colors = LocalAppColors.current
     val githubToken by viewModel.githubToken.collectAsState()
+    val deepseekApiKey by viewModel.deepseekApiKey.collectAsState()
     val openrouterApiKey by viewModel.openrouterApiKey.collectAsState()
     val sambanovaApiKey by viewModel.sambanovaApiKey.collectAsState()
     val showClearConfirm by viewModel.showClearConfirm.collectAsState()
@@ -40,9 +41,11 @@ fun SettingsScreen(
     val privacyEnabled by viewModel.privacyModeEnabled.collectAsState()
 
     var showTokenDialog by remember { mutableStateOf(false) }
+    var showDeepSeekKeyDialog by remember { mutableStateOf(false) }
     var showOpenRouterKeyDialog by remember { mutableStateOf(false) }
     var showSambanovaKeyDialog by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf(githubToken) }
+    var deepseekKeyInput by remember { mutableStateOf(deepseekApiKey) }
     var openrouterKeyInput by remember { mutableStateOf(openrouterApiKey) }
     var sambanovaKeyInput by remember { mutableStateOf(sambanovaApiKey) }
 
@@ -69,7 +72,31 @@ fun SettingsScreen(
                         .background(colors.surface)
                         .padding(Spacing.CardSpacing)
                 ) {
-                    // OpenRouter（主力）
+                    // DeepSeek（主力）
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("DeepSeek（主力）", fontSize = 15.sp, color = colors.textPrimary)
+                            if (deepseekApiKey.isNotBlank()) {
+                                Text(
+                                    "${deepseekApiKey.take(8)}...${deepseekApiKey.takeLast(4)}",
+                                    fontSize = 11.sp, color = colors.success, fontFamily = FontFamily.Monospace
+                                )
+                            } else {
+                                Text("已配置默认 Key", fontSize = 11.sp, color = colors.success)
+                            }
+                        }
+                        IconButton(onClick = { deepseekKeyInput = deepseekApiKey; showDeepSeekKeyDialog = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+
+                                        // OpenRouter（主力）
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -245,7 +272,34 @@ fun SettingsScreen(
         )
     }
 
-    // OpenRouter Key dialog
+    // DeepSeek Key dialog
+    if (showDeepSeekKeyDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeepSeekKeyDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置 DeepSeek API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 platform.deepseek.com 获取，用于主力模型", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = deepseekKeyInput, onValueChange = { deepseekKeyInput = it },
+                        label = { Text("DeepSeek API Key", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveDeepSeekApiKey(deepseekKeyInput.trim()); showDeepSeekKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showDeepSeekKeyDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+        // OpenRouter Key dialog
     if (showOpenRouterKeyDialog) {
         AlertDialog(
             onDismissRequest = { showOpenRouterKeyDialog = false },

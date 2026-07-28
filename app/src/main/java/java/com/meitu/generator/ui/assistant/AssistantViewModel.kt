@@ -11,8 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.agent.AgentEngine
 import com.meitu.generator.data.agent.IntentRouter
 import com.meitu.generator.data.agent.ThinkingChainManager
-import com.meitu.generator.data.local.dao.ChatMessageDao
-import com.meitu.generator.data.local.entity.ChatMessageEntity
+import com.meitu.generator.data.remote.DeepSeekBalanceService
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.data.remote.dto.OpenAIMessage
 import com.meitu.generator.data.remote.dto.OpenAIRequest
@@ -36,6 +35,15 @@ data class TaskProgress(
     val downloadUrl: String? = null
 )
 
+
+data class BalanceInfo(
+    val totalBalance: String = "--",
+    val toppedUp: String = "--",
+    val used: String = "--",
+    val available: Boolean = false,
+    val currency: String = "CNY"
+)
+
 data class ChatMessage(
     val id: Long = System.nanoTime(),
     val text: String,
@@ -53,8 +61,8 @@ class AssistantViewModel @Inject constructor(
     private val settingsRepo: SettingsRepository,
     private val openAIService: OpenAIService,
     private val agentEngine: AgentEngine,
-    private val chatMessageDao: ChatMessageDao,
-    @Named("securePrefs") private val securePrefs: SharedPreferences
+    @Named("securePrefs") private val securePrefs: SharedPreferences,
+    private val deepSeekBalanceService: DeepSeekBalanceService
 ) : AndroidViewModel(application) {
 
     // ============ Chat Messages ============
@@ -72,6 +80,13 @@ class AssistantViewModel @Inject constructor(
     // ============ 附件（图片） ============
     private val _pendingImageUri = MutableStateFlow<String?>(null)
     val pendingImageUri: StateFlow<String?> = _pendingImageUri.asStateFlow()
+
+    // ============ 余额信息 ============
+    private val _balance = MutableStateFlow(BalanceInfo())
+    val balance: StateFlow<BalanceInfo> = _balance.asStateFlow()
+
+    private val _balanceLoading = MutableStateFlow(false)
+    val balanceLoading: StateFlow<Boolean> = _balanceLoading.asStateFlow()
 
     // ============ AI 模型 ============
     private val _currentModel = MutableStateFlow(Constants.OPENAI_MODEL)
@@ -133,38 +148,35 @@ class AssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedModel = settingsRepo.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
             _currentModel.value = savedModel
+        }
+    }
 
-            // 从数据库加载历史消息
-            val recentMessages = chatMessageDao.getRecent(50)
-            if (recentMessages.isNotEmpty()) {
-                val chatMessages = recentMessages.map { entity ->
-                    ChatMessage(
-                        id = entity.id,
-                        text = entity.text,
-                        isUser = entity.isUser,
-                        isSystem = entity.isSystem,
-                        imageUri = entity.imageUri,
-                        reasoningContent = entity.reasoningContent,
-                        timestamp = entity.timestamp
+
+
+    fun refreshBalance() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _balanceLoading.value = true
+            try {
+                val savedKey = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
+                val apiKey = if (savedKey.isNotBlank()) savedKey else Constants.OPENAI_API_KEY
+                val response = deepSeekBalanceService.getBalance("Bearer $apiKey")
+                val cnyInfo = response.balanceInfos.find { it.currency == "CNY" }
+                if (cnyInfo != null) {
+                    val toppedUp = cnyInfo.toppedUpBalance.toFloatOrNull() ?: 0f
+                    val total = cnyInfo.totalBalance.toFloatOrNull() ?: 0f
+                    val used = toppedUp - total
+                    _balance.value = BalanceInfo(
+                        totalBalance = "%.2f".format(total),
+                        toppedUp = "%.2f".format(toppedUp),
+                        used = "%.2f".format(used),
+                        available = response.isAvailable,
+                        currency = "CNY"
                     )
                 }
-                // 保留欢迎消息 + 追加历史消息
-                val welcomeMsg = _messages.value.firstOrNull()
-                _messages.value = if (welcomeMsg != null) {
-                    listOf(welcomeMsg) + chatMessages
-                } else {
-                    chatMessages
-                }
-
-                // 重建 conversationHistory（用于 API 上下文）
-                for (entity in recentMessages) {
-                    val role = when {
-                        entity.isUser -> "user"
-                        entity.isSystem -> "system"
-                        else -> "assistant"
-                    }
-                    conversationHistory.add(OpenAIMessage(role = role, content = entity.text))
-                }
+            } catch (e: Exception) {
+                // 静默失败
+            } finally {
+                _balanceLoading.value = false
             }
         }
     }
@@ -203,18 +215,6 @@ class AssistantViewModel @Inject constructor(
         )
         _messages.value = (_messages.value + userMsg).takeLast(100)
         _isLoading.value = true
-
-        // 持久化用户消息
-        viewModelScope.launch(Dispatchers.IO) {
-            chatMessageDao.insert(
-                ChatMessageEntity(
-                    text = input.ifEmpty { "[用户发送了一张图片]" },
-                    isUser = true,
-                    isSystem = false,
-                    imageUri = imageUri
-                )
-            )
-        }
 
         val hasImage = imageUri != null
         val deepThinking = _deepThinkingEnabled.value
@@ -308,7 +308,8 @@ class AssistantViewModel @Inject constructor(
                     statusCallback = statusCallback,
                     deepThinkingEnabled = deepThinking,
                     webSearchEnabled = webSearch,
-                    thinkingCallback = thinkingCallback
+                    thinkingCallback = thinkingCallback,
+                    conversationHistory = conversationHistory.toList()
                 )
 
                 // 获取思考内容
@@ -371,23 +372,6 @@ class AssistantViewModel @Inject constructor(
                     )).takeLast(100)
                 }
 
-                // 持久化 AI 回复
-                val aiMsg = ChatMessage(
-                    text = response,
-                    isUser = false,
-                    reasoningContent = reasoning
-                )
-                viewModelScope.launch(Dispatchers.IO) {
-                    chatMessageDao.insert(
-                        ChatMessageEntity(
-                            text = response,
-                            isUser = false,
-                            isSystem = false,
-                            reasoningContent = reasoning
-                        )
-                    )
-                }
-
                 conversationHistory.add(OpenAIMessage(role = "assistant", content = response))
                 if (conversationHistory.size > 20) {
                     conversationHistory.removeAt(0)
@@ -439,9 +423,5 @@ class AssistantViewModel @Inject constructor(
             isUser = false
         ))
         conversationHistory.clear()
-        // 同时清空数据库
-        viewModelScope.launch(Dispatchers.IO) {
-            chatMessageDao.deleteAll()
-        }
     }
 }

@@ -1,34 +1,21 @@
 package com.meitu.generator.util
 
 object Constants {
-    // ============ DeepSeek API（主力代码模型） ============
-    const val DEEPSEEK_BASE_URL = "https://api.deepseek.com/"
-    val DEEPSEEK_API_KEY: String get() = String(byteArrayOf(115,107,45,55,50,52,57,100,56,52,48,57,53,99,48,52,97,98,50,56,55,56,102,53,100,97,102,98,55,99,102,55,100,97,52))
-    const val DEEPSEEK_MODEL = "deepseek-chat"
-    const val KEY_DEEPSEEK_API_KEY = "deepseek_api_key"
+    // ============ AI 大脑 - DeepSeek API（主力） ============
+    const val OPENAI_BASE_URL = "https://api.deepseek.com/v1/"
+    val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,55,50,52,57,100,56,52,48,57,53,99,48,52,97,98,55,56,55,98,48,52,100,97,53,55,97,102,55,54,97,53,102,51,100,97,102,98,57,55,99,102))
+    const val OPENAI_MODEL = "deepseek-chat"
 
-    // ============ OpenRouter API（扩展模型池） ============
-    const val OPENAI_BASE_URL = "https://openrouter.ai/api/v1/"
-    val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,111,114,45,118,49,45,48,98,50,98,50,53,52,99,57,51,54,52,48,99,51,55,98,98,48,53,49,49,56,97,48,52,100,54,98,52,51,52,102,56,48,48,55,102,57,56,49,50,102,99,97,48,48,99,97,98,55,98,48,53,53,56,100,102,52,97,99,48,97,56))
-    const val OPENAI_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+    // ============ OpenRouter（备用） ============
+    const val OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/"
+    val OPENROUTER_API_KEY: String get() = String(byteArrayOf(115,107,45,111,114,45,118,49,45,48,97,49,57,54,99,57,56,48,102,50,57,57,102,50,53,48,52,53,49,53,54,56,51,102,54,56,50,49,54,55,101,100,55,56,48,48,55,102,57,56,49,50,102,99,97,48,50,97,50,98,49,52,99,51,53,50,98,48,53,53,56,100,102,52,97,99,48,97,56))
+    const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
 
-    // ============ Google Gemini API（轻量任务 + 视觉） ============
-    const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/"
-    val GEMINI_API_KEY: String get() = String(byteArrayOf(65,81,46,65,98,56,82,78,54,74,100,109,53,50,81,84,88,68,50,49,111,111,85,85,78,102,95,110,73,54,78,71,45,89,102,54,90,114,98,73,55,95,101,121,75,73,79,85,81,54,85,55,119))
-    const val GEMINI_MODEL = "gemini-2.0-flash"
-    const val GEMINI_EMBEDDING_MODEL = "text-embedding-004"
-    const val KEY_GEMINI_API_KEY = "gemini_api_key"
-
-    // ============ SambaNova API（备用，已验证可用） ============
+    // ============ SambaNova API（备用） ============
     const val SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1/"
     val SAMBANOVA_API_KEY: String get() = String(byteArrayOf(51,49,99,54,53,49,55,102,45,97,55,54,49,45,52,56,52,101,45,98,55,102,51,45,55,100,56,50,57,56,101,100,50,98,55,49))
     const val SAMBANOVA_MODEL = "Meta-Llama-3.3-70B-Instruct"
     const val KEY_SAMBANOVA_API_KEY = "sambanova_api_key"
-
-    // ============ OpenRouter 扩展配置 ============
-    const val OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/"
-    val OPENROUTER_API_KEY: String get() = OPENAI_API_KEY
-    const val KEY_OPENROUTER_API_KEY = "openrouter_api_key"
 
     // ============ 视觉模型（OpenRouter 多模态） ============
     const val VISION_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
@@ -36,21 +23,13 @@ object Constants {
     val AVAILABLE_MODELS = listOf(
         // 自动模式（智能路由）
         "auto",
-        // DeepSeek（主力代码模型）
+        // DeepSeek
         "deepseek-chat",
-        // Google Gemini（轻量 + 视觉）
-        "gemini-2.0-flash",
-        // OpenRouter 免费模型
+        "deepseek-reasoner",
+        // OpenRouter（备用）
         "nvidia/nemotron-3-super-120b-a12b:free",
-        "google/gemma-3-27b-it:free",
-        "openai/gpt-oss-20b:free",
-        "inclusionai/ling-3.0-flash:free",
-        "nvidia/nemotron-3-nano-30b-a3b:free",
-        // SambaNova 免费模型（备用）
-        "Meta-Llama-3.3-70B-Instruct",
-        "DeepSeek-V3.1",
-        "gemma-4-31B-it",
-        "gpt-oss-120b"
+        // SambaNova（备用）
+        "Meta-Llama-3.3-70B-Instruct"
     )
 
     const val KEY_AI_MODEL = "ai_model"
@@ -76,6 +55,6 @@ object Constants {
     const val GITHUB_POLL_INTERVAL_MS = 15000L
 
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "4.8.0"
-    const val APP_VERSION_CODE = 43
+    const val APP_VERSION = "4.9.1"
+    const val APP_VERSION_CODE = 45
 }

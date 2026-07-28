@@ -6,6 +6,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.google.gson.GsonBuilder
 import com.meitu.generator.data.remote.GitHubService
+import com.meitu.generator.data.remote.DeepSeekBalanceService
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.data.remote.dto.OpenAIMessage
 import com.meitu.generator.data.remote.dto.OpenAIMessageDeserializer
@@ -83,6 +84,26 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("deepseek")
+    fun provideDeepSeekRetrofit(
+        client: OkHttpClient,
+        @Named("openaiGson") gson: com.google.gson.Gson
+    ): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(com.meitu.generator.util.Constants.OPENAI_BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDeepSeekBalanceService(@Named("deepseek") retrofit: Retrofit): DeepSeekBalanceService {
+        return retrofit.create(DeepSeekBalanceService::class.java)
+    }
+
+    @Provides
+    @Singleton
     fun provideOpenAIService(@Named("openai") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
     }
@@ -125,49 +146,11 @@ object NetworkModule {
         return retrofit.create(OpenAIService::class.java)
     }
 
-
-    // ============ DeepSeek API（主力代码模型） ============
-    @Provides
-    @Singleton
-    @Named("deepseek")
-    fun provideDeepSeekRetrofit(client: OkHttpClient, @Named("openaiGson") gson: com.google.gson.Gson): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.DEEPSEEK_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-    }
-
     @Provides
     @Singleton
     @Named("deepseekService")
     fun provideDeepSeekService(@Named("deepseek") retrofit: Retrofit): OpenAIService {
         return retrofit.create(OpenAIService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideDeepSeekBalanceService(@Named("deepseek") retrofit: Retrofit): com.meitu.generator.data.remote.DeepSeekService {
-        return retrofit.create(com.meitu.generator.data.remote.DeepSeekService::class.java)
-    }
-
-
-    // ============ Google Gemini API（轻量任务 + 视觉） ============
-    @Provides
-    @Singleton
-    @Named("gemini")
-    fun provideGeminiRetrofit(client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(Constants.GEMINI_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideGeminiService(@Named("gemini") retrofit: Retrofit): com.meitu.generator.data.remote.GeminiService {
-        return retrofit.create(com.meitu.generator.data.remote.GeminiService::class.java)
     }
 
     // ============ GitHub API ============

@@ -13,8 +13,8 @@ android {
         applicationId = "com.meitu.generator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 44
-        versionName = "4.9.0"
+        versionCode = 45
+        versionName = "4.9.1"
         multiDexEnabled = true
     }
 
@@ -47,8 +47,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
-
-
 }
 
 dependencies {

@@ -1,13 +1,10 @@
 package com.meitu.generator.repository
 
-import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import javax.inject.Named
 import com.meitu.generator.data.local.dao.SettingsDao
 import com.meitu.generator.data.local.entity.SettingEntity
 import com.meitu.generator.util.Constants
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -16,19 +13,8 @@ import javax.inject.Singleton
 @Singleton
 class SettingsRepository @Inject constructor(
     private val settingsDao: SettingsDao,
-    @ApplicationContext private val context: Context
+    @Named("securePrefs") private val securePrefs: SharedPreferences
 ) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val securePrefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        "secure_prefs",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
 
     suspend fun getInt(key: String, default: Int): Int {
         return settingsDao.getSetting(key)?.value?.toIntOrNull() ?: default
@@ -79,6 +65,10 @@ class SettingsRepository @Inject constructor(
 
     fun getApiKey(key: String): String {
         return securePrefs.getString(key, "") ?: ""
+    }
+
+    suspend fun deleteSetting(key: String) {
+        settingsDao.delete(key)
     }
 
     suspend fun initDefaults() {

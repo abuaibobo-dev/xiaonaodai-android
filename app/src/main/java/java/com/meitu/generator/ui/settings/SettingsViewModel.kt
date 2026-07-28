@@ -50,7 +50,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun refreshApiKeys() {
-        _deepseekApiKey.value = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
+        _deepseekApiKey.value = securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: ""
         _openrouterApiKey.value = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
         _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
     }
@@ -72,7 +72,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveDeepSeekApiKey(key: String) {
-        securePrefs.edit().putString(Constants.KEY_DEEPSEEK_API_KEY, key).apply()
+        securePrefs.edit().putString(Constants.KEY_AI_API_KEY, key).apply()
         _deepseekApiKey.value = key
         _toastMessage.value = "✅ DeepSeek API Key 已保存"
     }
@@ -97,7 +97,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearChatHistory() {
-        _toastMessage.value = "对话历史已清空"
+        viewModelScope.launch {
+            try {
+                settingsRepo.deleteSetting("chat_history_cache")
+            } catch (_: Exception) {}
+            _toastMessage.value = "对话历史已清空"
+        }
     }
 
     fun showClearAllConfirm() { _showClearConfirm.value = true }

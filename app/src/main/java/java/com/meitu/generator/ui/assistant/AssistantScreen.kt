@@ -217,7 +217,7 @@ fun AssistantScreen(
     LaunchedEffect(lastMessageId, isLoading) {
         if (messages.isNotEmpty()) {
             delay(100)
-            val targetIndex = messages.size - 1 + (if (isLoading) 1 else 0)
+            val targetIndex = (messages.size - 1 + (if (isLoading) 1 else 0)).coerceIn(0, messages.size + 2)
             try { listState.scrollToItem(index = targetIndex, scrollOffset = 0) } catch (_: Exception) {}
             delay(50)
             try { listState.animateScrollToItem(index = targetIndex, scrollOffset = 0) } catch (_: Exception) {}

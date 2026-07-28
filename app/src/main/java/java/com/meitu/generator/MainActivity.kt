@@ -358,6 +358,11 @@ private fun SidebarDrawer(
 ) {
     val colors = LocalAppColors.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    val balance by viewModel.balance.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshBalance()
+    }
 
     Box(
         modifier = Modifier
@@ -444,6 +449,55 @@ private fun SidebarDrawer(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.Bottom
             ) {
+                // ============ 余额显示区 ============
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Text("💰", fontSize = 14.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "账户余额",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "¥${balance.totalBalance}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if ((balance.totalBalance.toFloatOrNull() ?: 0f) < 0) colors.error else colors.accent
+                    )
+                }
+                // 一键查询用量
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.accent.copy(alpha = 0.08f))
+                        .clickable {
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://platform.deepseek.com/usage"))
+                                ctx.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    Text("🌐", fontSize = 12.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "查询用量明细",
+                        fontSize = 12.sp,
+                        color = colors.accent,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("›", fontSize = 14.sp, color = colors.accent)
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
