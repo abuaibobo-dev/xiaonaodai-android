@@ -334,15 +334,10 @@ import kotlin.random.Random
                 if (packageIdx >= 0) {
                     lines.add(packageIdx + 1, "")
                     lines.add(packageIdx + 2, fallbackImports)
-                    fixed = lines.joinToString("
-")
+                    fixed = lines.joinToString("\n")
                 }
             } else {
-                fixed = "package com.example.app
-
-$fallbackImports
-
-$fixed"
+                fixed = "package com.example.app\n\n$fallbackImports\n\n$fixed"
             }
         }
         
