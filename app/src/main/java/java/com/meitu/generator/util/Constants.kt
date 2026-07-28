@@ -3,7 +3,7 @@ package com.meitu.generator.util
 object Constants {
     // ============ AI 大脑 - DeepSeek API（主力） ============
     const val OPENAI_BASE_URL = "https://api.deepseek.com/v1/"
-    val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,55,50,52,57,100,56,52,48,57,53,99,48,52,97,98,55,56,55,98,48,52,100,97,53,55,97,102,55,54,97,53,102,51,100,97,102,98,57,55,99,102))
+    val OPENAI_API_KEY: String get() = String(byteArrayOf(115,107,45,55,50,52,57,100,56,52,48,57,53,99,48,52,97,98,50,56,55,56,102,53,100,97,102,98,55,99,102,55,100,97,52))
     const val OPENAI_MODEL = "deepseek-chat"
 
     // ============ OpenRouter（备用） ============
