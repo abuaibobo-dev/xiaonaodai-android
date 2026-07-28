@@ -15,9 +15,11 @@ import com.meitu.generator.data.local.entity.*
         // EverOS 语义记忆系统
         EverMemoryEntity::class,
         EverMemorySceneEntity::class,
-        UserProfileEntity::class
+        UserProfileEntity::class,
+        // 聊天消息持久化
+        ChatMessageEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,4 +29,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
     abstract fun planDao(): PlanDao
     abstract fun everMemoryDao(): EverMemoryDao
+    abstract fun chatMessageDao(): ChatMessageDao
 }

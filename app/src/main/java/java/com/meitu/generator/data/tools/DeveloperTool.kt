@@ -2,11 +2,12 @@ package com.meitu.generator.data.tools
 
 import android.content.SharedPreferences
 import com.google.gson.JsonObject
+import com.meitu.generator.data.agent.AgentEngine
 import com.meitu.generator.data.agent.Tool
 import com.meitu.generator.data.model.ToolContext
+import com.meitu.generator.data.remote.GeminiService
 import com.meitu.generator.data.remote.OpenAIService
-import com.meitu.generator.data.remote.dto.OpenAIMessage
-import com.meitu.generator.data.remote.dto.OpenAIRequest
+import com.meitu.generator.data.remote.dto.*
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.util.Constants
 import javax.inject.Inject
@@ -17,15 +18,14 @@ import javax.inject.Singleton
  * 开发者工具 - 生成单个 Kotlin 文件
  * 
  * 功能: 根据用户需求生成完整的 Kotlin 代码文件
- * 
- * 调用流程:
- * 1. 接收用户需求描述和文件名
- * 2. 调用 LLM 生成完整代码
- * 3. 返回生成的代码内容
+ * 支持多模型路由：OpenRouter / SambaNova / DeepSeek / Gemini
  */
 @Singleton
 class DeveloperTool @Inject constructor(
     private val openAIService: OpenAIService,
+    @Named("sambanovaService") private val sambanovaService: OpenAIService,
+    @Named("deepseekService") private val deepseekService: OpenAIService,
+    private val geminiService: GeminiService,
     private val settingsRepository: SettingsRepository,
     @Named("securePrefs") private val securePrefs: SharedPreferences
 ) : Tool {
@@ -51,6 +51,13 @@ class DeveloperTool @Inject constructor(
             add("filePath")
             add("requirement")
         })
+    }
+
+    companion object {
+        private val SAMBANOVA_MODELS = setOf(
+            "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b",
+            "DeepSeek-V3.1", "gemma-4-31B-it"
+        )
     }
 
     override suspend fun execute(arguments: Map<String, Any>, context: ToolContext): String {
@@ -85,29 +92,20 @@ class DeveloperTool @Inject constructor(
         }
 
         try {
-            val request = OpenAIRequest(
-                model = effectiveModel,
-                messages = listOf(OpenAIMessage(role = "user", content = prompt)),
-                temperature = 0.3,
-                max_tokens = 4000
-            )
-
-            val apiKey = (securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "").ifBlank { Constants.OPENAI_API_KEY }
-            val response = openAIService.chatCompletions(
-                request = request,
-                authorization = "Bearer $apiKey"
-            )
-
-            if (response.error != null) {
-                return "代码生成失败: ${response.error.message}"
+            val platform = AgentEngine.getModelPlatform(effectiveModel)
+            val content = when (platform) {
+                "gemini" -> callGemini(effectiveModel, prompt)
+                "deepseek" -> callOpenAICompatible(deepseekService, getDeepSeekApiKey(), effectiveModel, prompt)
+                "sambanova" -> callOpenAICompatible(sambanovaService, getSambaNovaApiKey(), effectiveModel, prompt)
+                else -> callOpenAICompatible(openAIService, getOpenRouterApiKey(), effectiveModel, prompt)
             }
 
-            val content = response.choices?.firstOrNull()?.message?.content?.trim()
-                ?: return "代码生成失败: 无响应内容"
+            if (content.startsWith("[ERROR]") || content.startsWith("[调用失败]")) {
+                return "代码生成失败: $content"
+            }
 
-            // 提取代码块
             val code = extractKotlinCode(content)
-            
+
             return buildString {
                 appendLine("✅ 代码生成成功")
                 appendLine("文件: $filePath")
@@ -125,22 +123,82 @@ class DeveloperTool @Inject constructor(
         }
     }
 
+    private suspend fun callOpenAICompatible(
+        service: OpenAIService,
+        apiKey: String,
+        model: String,
+        prompt: String
+    ): String {
+        val request = OpenAIRequest(
+            model = model,
+            messages = listOf(OpenAIMessage(role = "user", content = prompt)),
+            temperature = 0.3,
+            max_tokens = 4000
+        )
+        val response = service.chatCompletions(
+            request = request,
+            authorization = "Bearer $apiKey"
+        )
+        if (response.error != null) {
+            return "[ERROR] ${response.error.message ?: "未知错误"}"
+        }
+        return response.choices?.firstOrNull()?.message?.content?.trim()
+            ?: "[ERROR] 无响应内容"
+    }
+
+    private suspend fun callGemini(model: String, prompt: String): String {
+        val geminiRequest = GeminiRequest(
+            contents = listOf(
+                GeminiContent(
+                    parts = listOf(GeminiPart(text = prompt))
+                )
+            )
+        )
+        val response = geminiService.generateContent(
+            model = model,
+            apiKey = getGeminiApiKey(),
+            request = geminiRequest
+        )
+        if (response.error != null) {
+            return "[ERROR] ${response.error.message ?: "未知错误"}"
+        }
+        return response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text?.trim()
+            ?: "[ERROR] 无响应内容"
+    }
+
+    private fun getOpenRouterApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
+        return if (savedKey.isNotBlank()) savedKey else Constants.OPENROUTER_API_KEY
+    }
+
+    private fun getSambaNovaApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.SAMBANOVA_API_KEY else savedKey
+    }
+
+    private fun getDeepSeekApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.DEEPSEEK_API_KEY else savedKey
+    }
+
+    private fun getGeminiApiKey(): String {
+        val savedKey = securePrefs.getString(Constants.KEY_GEMINI_API_KEY, "")
+        return if (savedKey.isNullOrBlank()) Constants.GEMINI_API_KEY else savedKey
+    }
+
     private fun extractKotlinCode(content: String): String {
-        // 尝试提取 ```kotlin ... ``` 代码块
         val codeBlockRegex = Regex("```kotlin\\s*\\n(.*?)\\n```", RegexOption.DOT_MATCHES_ALL)
         val match = codeBlockRegex.find(content)
         if (match != null) {
             return match.groupValues[1].trim()
         }
         
-        // 如果没有代码块标记，尝试提取 ``` ... ```
         val genericBlockRegex = Regex("```\\s*\\n(.*?)\\n```", RegexOption.DOT_MATCHES_ALL)
         val genericMatch = genericBlockRegex.find(content)
         if (genericMatch != null) {
             return genericMatch.groupValues[1].trim()
         }
         
-        // 都没有，返回原始内容
         return content.trim()
     }
 }

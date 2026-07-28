@@ -36,6 +36,9 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Lazily, Constants.DEFAULT_GITHUB_TOKEN)
 
     // ============ API Keys（仅保留可用平台） ============
+    private val _deepseekApiKey = MutableStateFlow("")
+    val deepseekApiKey: StateFlow<String> = _deepseekApiKey.asStateFlow()
+
     private val _openrouterApiKey = MutableStateFlow("")
     val openrouterApiKey: StateFlow<String> = _openrouterApiKey.asStateFlow()
 
@@ -47,6 +50,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun refreshApiKeys() {
+        _deepseekApiKey.value = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
         _openrouterApiKey.value = securePrefs.getString(Constants.KEY_OPENROUTER_API_KEY, "") ?: ""
         _sambanovaApiKey.value = securePrefs.getString(Constants.KEY_SAMBANOVA_API_KEY, "") ?: ""
     }
@@ -65,6 +69,12 @@ class SettingsViewModel @Inject constructor(
 
     fun saveGithubToken(token: String) {
         securePrefs.edit().putString(Constants.KEY_GITHUB_TOKEN, token).apply()
+    }
+
+    fun saveDeepSeekApiKey(key: String) {
+        securePrefs.edit().putString(Constants.KEY_DEEPSEEK_API_KEY, key).apply()
+        _deepseekApiKey.value = key
+        _toastMessage.value = "✅ DeepSeek API Key 已保存"
     }
 
     fun saveOpenRouterApiKey(key: String) {

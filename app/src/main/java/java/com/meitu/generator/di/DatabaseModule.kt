@@ -34,6 +34,7 @@ object DatabaseModule {
     @Provides fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
     @Provides fun provideMemoryDao(db: AppDatabase): MemoryDao = db.memoryDao()
     @Provides fun providePlanDao(db: AppDatabase): PlanDao = db.planDao()
+    @Provides fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
     @Provides fun provideEverMemoryDao(db: AppDatabase): EverMemoryDao = db.everMemoryDao()
 
     // ============ EverOS 语义记忆系统依赖 ============

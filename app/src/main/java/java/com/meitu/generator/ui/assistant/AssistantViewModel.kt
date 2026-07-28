@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.agent.AgentEngine
 import com.meitu.generator.data.agent.IntentRouter
 import com.meitu.generator.data.agent.ThinkingChainManager
+import com.meitu.generator.data.local.dao.ChatMessageDao
+import com.meitu.generator.data.local.entity.ChatMessageEntity
 import com.meitu.generator.data.remote.OpenAIService
 import com.meitu.generator.data.remote.dto.OpenAIMessage
 import com.meitu.generator.data.remote.dto.OpenAIRequest
@@ -51,6 +53,7 @@ class AssistantViewModel @Inject constructor(
     private val settingsRepo: SettingsRepository,
     private val openAIService: OpenAIService,
     private val agentEngine: AgentEngine,
+    private val chatMessageDao: ChatMessageDao,
     @Named("securePrefs") private val securePrefs: SharedPreferences
 ) : AndroidViewModel(application) {
 
@@ -130,6 +133,39 @@ class AssistantViewModel @Inject constructor(
         viewModelScope.launch {
             val savedModel = settingsRepo.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
             _currentModel.value = savedModel
+
+            // 从数据库加载历史消息
+            val recentMessages = chatMessageDao.getRecent(50)
+            if (recentMessages.isNotEmpty()) {
+                val chatMessages = recentMessages.map { entity ->
+                    ChatMessage(
+                        id = entity.id,
+                        text = entity.text,
+                        isUser = entity.isUser,
+                        isSystem = entity.isSystem,
+                        imageUri = entity.imageUri,
+                        reasoningContent = entity.reasoningContent,
+                        timestamp = entity.timestamp
+                    )
+                }
+                // 保留欢迎消息 + 追加历史消息
+                val welcomeMsg = _messages.value.firstOrNull()
+                _messages.value = if (welcomeMsg != null) {
+                    listOf(welcomeMsg) + chatMessages
+                } else {
+                    chatMessages
+                }
+
+                // 重建 conversationHistory（用于 API 上下文）
+                for (entity in recentMessages) {
+                    val role = when {
+                        entity.isUser -> "user"
+                        entity.isSystem -> "system"
+                        else -> "assistant"
+                    }
+                    conversationHistory.add(OpenAIMessage(role = role, content = entity.text))
+                }
+            }
         }
     }
 
@@ -167,6 +203,18 @@ class AssistantViewModel @Inject constructor(
         )
         _messages.value = (_messages.value + userMsg).takeLast(100)
         _isLoading.value = true
+
+        // 持久化用户消息
+        viewModelScope.launch(Dispatchers.IO) {
+            chatMessageDao.insert(
+                ChatMessageEntity(
+                    text = input.ifEmpty { "[用户发送了一张图片]" },
+                    isUser = true,
+                    isSystem = false,
+                    imageUri = imageUri
+                )
+            )
+        }
 
         val hasImage = imageUri != null
         val deepThinking = _deepThinkingEnabled.value
@@ -323,6 +371,23 @@ class AssistantViewModel @Inject constructor(
                     )).takeLast(100)
                 }
 
+                // 持久化 AI 回复
+                val aiMsg = ChatMessage(
+                    text = response,
+                    isUser = false,
+                    reasoningContent = reasoning
+                )
+                viewModelScope.launch(Dispatchers.IO) {
+                    chatMessageDao.insert(
+                        ChatMessageEntity(
+                            text = response,
+                            isUser = false,
+                            isSystem = false,
+                            reasoningContent = reasoning
+                        )
+                    )
+                }
+
                 conversationHistory.add(OpenAIMessage(role = "assistant", content = response))
                 if (conversationHistory.size > 20) {
                     conversationHistory.removeAt(0)
@@ -374,5 +439,9 @@ class AssistantViewModel @Inject constructor(
             isUser = false
         ))
         conversationHistory.clear()
+        // 同时清空数据库
+        viewModelScope.launch(Dispatchers.IO) {
+            chatMessageDao.deleteAll()
+        }
     }
 }
