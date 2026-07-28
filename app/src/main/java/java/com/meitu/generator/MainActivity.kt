@@ -73,8 +73,7 @@ data class DrawerItem(
 val drawerItems = listOf(
     DrawerItem(Routes.ASSISTANT, Icons.Outlined.Chat, "对话"),
     DrawerItem(Routes.PROJECTS, Icons.Outlined.Folder, "项目"),
-    DrawerItem(Routes.CLOUD_BUILD, Icons.Outlined.Build, "编译"),
-    // 设置已移至头像菜单
+    // 编译、设置、用量等功能已移至头像菜单
 )
 
 @Composable
@@ -490,7 +489,7 @@ private fun SidebarDrawer(
                             onDismissRequest = { showAvatarMenu = false },
                             modifier = Modifier.background(colors.surface)
                         ) {
-                            // 余额显示
+                            // 余额 & 用量
                             DropdownMenuItem(
                                 text = {
                                     Row(
@@ -499,8 +498,14 @@ private fun SidebarDrawer(
                                     ) {
                                         Text("💰", fontSize = 14.sp)
                                         Spacer(Modifier.width(8.dp))
-                                        Text("账户余额", fontSize = 14.sp, color = colors.textPrimary)
-                                        Spacer(Modifier.weight(1f))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("账户余额", fontSize = 14.sp, color = colors.textPrimary)
+                                            Text(
+                                                "点击查看用量详情",
+                                                fontSize = 11.sp,
+                                                color = colors.textSecondary
+                                            )
+                                        }
                                         Text(
                                             "¥${balance.totalBalance}",
                                             fontSize = 14.sp,
@@ -518,7 +523,7 @@ private fun SidebarDrawer(
                                     } catch (_: Exception) {}
                                 }
                             )
-                            
+
                             // 分隔线
                             Box(
                                 modifier = Modifier
@@ -527,7 +532,22 @@ private fun SidebarDrawer(
                                     .height(0.5.dp)
                                     .background(colors.border)
                             )
-                            
+
+                            // 云端编译
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🔨", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("云端编译", fontSize = 14.sp, color = colors.textPrimary)
+                                    }
+                                },
+                                onClick = {
+                                    showAvatarMenu = false
+                                    onNavigate(Routes.CLOUD_BUILD)
+                                }
+                            )
+
                             // AI Key 配置
                             DropdownMenuItem(
                                 text = {
@@ -542,22 +562,7 @@ private fun SidebarDrawer(
                                     onNavigate(Routes.SETTINGS)
                                 }
                             )
-                            
-                            // 系统设置
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("⚙️", fontSize = 14.sp)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("系统设置", fontSize = 14.sp, color = colors.textPrimary)
-                                    }
-                                },
-                                onClick = {
-                                    showAvatarMenu = false
-                                    onNavigate(Routes.SETTINGS)
-                                }
-                            )
-                            
+
                             // 关于
                             DropdownMenuItem(
                                 text = {
@@ -572,7 +577,7 @@ private fun SidebarDrawer(
                                     onNavigate(Routes.SETTINGS)
                                 }
                             )
-                            
+
                             // 分隔线
                             Box(
                                 modifier = Modifier
@@ -581,7 +586,7 @@ private fun SidebarDrawer(
                                     .height(0.5.dp)
                                     .background(colors.border)
                             )
-                            
+
                             // DeepSeek 官网
                             DropdownMenuItem(
                                 text = {
