@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         // 启用 edge-to-edge，让 IME 键盘正确处理
-        androidx.activity.enableEdgeToEdge()
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             MeituTheme(darkTheme = true) {
                 MainScreen()

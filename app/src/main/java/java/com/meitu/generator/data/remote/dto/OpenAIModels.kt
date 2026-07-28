@@ -156,3 +156,17 @@ class OpenAIMessageDeserializer : JsonDeserializer<OpenAIMessage> {
         )
     }
 }
+
+// ============ Models List Response ============
+
+data class OpenAIModelsResponse(
+    val `object`: String? = null,
+    val data: List<ModelData>? = null
+)
+
+data class ModelData(
+    val id: String,
+    val `object`: String? = null,
+    val created: Long? = null,
+    val owned_by: String? = null
+)
