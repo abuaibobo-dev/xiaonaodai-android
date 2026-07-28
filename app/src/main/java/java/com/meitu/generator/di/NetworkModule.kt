@@ -92,6 +92,13 @@ object NetworkModule {
         return retrofit.create(OpenAIService::class.java)
     }
 
+    // 默认 OpenAIService（无 @Named 限定符，指向 DeepSeek）
+    @Provides
+    @Singleton
+    fun provideDefaultOpenAIService(@Named("deepseekService") service: OpenAIService): OpenAIService {
+        return service
+    }
+
     // ============ DeepSeek Balance Service ============
     @Provides
     @Singleton
