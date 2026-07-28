@@ -11,9 +11,13 @@ import com.meitu.generator.data.local.entity.*
         LogEntity::class,
         TaskEntity::class,
         MemoryEntity::class,
-        PlanEntity::class
+        PlanEntity::class,
+        // EverOS 语义记忆系统
+        EverMemoryEntity::class,
+        EverMemorySceneEntity::class,
+        UserProfileEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,4 +26,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun memoryDao(): MemoryDao
     abstract fun planDao(): PlanDao
+    abstract fun everMemoryDao(): EverMemoryDao
 }
