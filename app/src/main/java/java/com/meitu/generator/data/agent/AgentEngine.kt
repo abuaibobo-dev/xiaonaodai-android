@@ -275,13 +275,12 @@ class AgentEngine @Inject constructor(
                             for (cp in msg.contentParts) {
                                 if (cp.type == "text" && cp.text != null) {
                                     parts.add(GeminiPart(text = cp.text))
-                                } else if (cp.type == "image_url" && cp.image_url != null)
+                                } else if (cp.type == "image_url" && cp.image_url != null) {
                                     val base64Data = cp.image_url.url.substringAfter("base64,")
                                     parts.add(GeminiPart(inlineData = GeminiInlineData(
                                         mime_type = imageMimeType ?: "image/jpeg",
                                         data = base64Data
                                     )))
-                                }
                                 }
                             }
                         } else if (msg.content != null) {
