@@ -115,7 +115,7 @@ class CloudBuildTool @Inject constructor(
             if (newRun == null || newRun.isCompleted) {
                 // 自动触发可能还没生效，手动触发一次
                 callback?.onProgress(BuildProgress("building", "🚀 手动触发编译...", 0.2f))
-                val triggerResult = cloudBuildRepository.triggerBuild(token, Constants.GITHUB_USER_PROJECT_WORKFLOW_ID)
+                val triggerResult = cloudBuildRepository.triggerBuild(token)
                 if (triggerResult.isFailure) {
                     callback?.onProgress(BuildProgress("failed", "❌ 触发编译失败", errorLog = triggerResult.exceptionOrNull()?.message))
                     return "触发编译失败: ${triggerResult.exceptionOrNull()?.message?.take(200)}"
