@@ -248,7 +248,10 @@ class CloudBuildRepository @Inject constructor(
 
     suspend fun findApkArtifact(token: String, runId: Long): Result<Artifact?> = runCatching {
         val artifacts = gitHubService.getArtifacts(owner, repo, runId)
-        artifacts.artifacts.firstOrNull { !it.expired }
+        // 优先匹配 user-project-apk，其次匹配任意非过期产物
+        artifacts.artifacts.firstOrNull { it.name == "user-project-apk" && !it.expired }
+            ?: artifacts.artifacts.firstOrNull { it.name.endsWith("-apk") && !it.expired }
+            ?: artifacts.artifacts.firstOrNull { !it.expired }
     }
 
     /**
@@ -261,10 +264,11 @@ class CloudBuildRepository @Inject constructor(
         token: String,
         artifactId: Long,
         runId: Long? = null,
+        releaseTag: String = "latest-apk",
         onDownloadProgress: ((DownloadProgress) -> Unit)? = null
     ): Result<Pair<String, Long>> = runCatching {
         // 优先尝试从 Release 下载
-        val releaseResult = tryDownloadFromRelease(context, token, onDownloadProgress)
+        val releaseResult = tryDownloadFromRelease(context, token, releaseTag, onDownloadProgress)
         if (releaseResult != null) {
             return@runCatching releaseResult
         }
@@ -279,10 +283,11 @@ class CloudBuildRepository @Inject constructor(
     private suspend fun tryDownloadFromRelease(
         context: android.content.Context,
         token: String,
+        releaseTag: String = "latest-apk",
         onDownloadProgress: ((DownloadProgress) -> Unit)?
     ): Pair<String, Long>? {
         return try {
-            val release = gitHubService.getReleaseByTag(owner, repo, "latest-apk")
+            val release = gitHubService.getReleaseByTag(owner, repo, releaseTag)
             val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
                 ?: return null
 
@@ -478,3 +483,4 @@ data class PushSummary(
         if (failCount > 0) append(", $failCount 失败")
     }
 }
+

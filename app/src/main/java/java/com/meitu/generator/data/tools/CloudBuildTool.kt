@@ -104,35 +104,25 @@ class CloudBuildTool @Inject constructor(
                 return errMsg
             }
 
-            // ========== Step 2: 检查是否有正在进行的编译 ==========
-            val latestRun = cloudBuildRepository.getLatestRun(token).getOrNull()
-            if (latestRun != null && !latestRun.isCompleted) {
-                callback?.onProgress(BuildProgress("building", "⏳ 已有编译进行中，等待完成...", 0.15f))
-                // 等待已有编译完成
-                cloudBuildRepository.pollBuildStatus(token, latestRun.id).collect { run ->
-                    val elapsed = when (run.status) {
-                        "queued" -> 0.2f
-                        "in_progress" -> 0.4f
-                        else -> 0.5f
-                    }
-                    callback?.onProgress(BuildProgress("building", "⏳ 等待编译中... (${run.status})", elapsed))
+            // ========== Step 2: 等待推送触发的编译启动 ==========
+            // user-project-build.yml 配置了 push 到 user-project/** 自动触发
+            // 等待几秒让 GitHub 创建 run
+            callback?.onProgress(BuildProgress("building", "🚀 等待 GitHub Actions 启动编译...", 0.2f))
+            delay(8000)
+
+            // ========== Step 3: 获取最新 run 并轮询 ==========
+            var newRun = cloudBuildRepository.getLatestRun(token).getOrNull()
+            if (newRun == null || newRun.isCompleted) {
+                // 自动触发可能还没生效，手动触发一次
+                callback?.onProgress(BuildProgress("building", "🚀 手动触发编译...", 0.2f))
+                val triggerResult = cloudBuildRepository.triggerBuild(token, Constants.GITHUB_USER_PROJECT_WORKFLOW_ID)
+                if (triggerResult.isFailure) {
+                    callback?.onProgress(BuildProgress("failed", "❌ 触发编译失败", errorLog = triggerResult.exceptionOrNull()?.message))
+                    return "触发编译失败: ${triggerResult.exceptionOrNull()?.message?.take(200)}"
                 }
+                delay(5000)
+                newRun = cloudBuildRepository.getLatestRun(token).getOrNull()
             }
-
-            // ========== Step 3: 触发新编译 ==========
-            callback?.onProgress(BuildProgress("building", "🚀 触发 GitHub Actions 编译...", 0.2f))
-
-            val triggerResult = cloudBuildRepository.triggerBuild(token)
-            if (triggerResult.isFailure) {
-                callback?.onProgress(BuildProgress("failed", "❌ 触发编译失败", errorLog = triggerResult.exceptionOrNull()?.message))
-                return "触发编译失败: ${triggerResult.exceptionOrNull()?.message?.take(200)}"
-            }
-
-            // 等待 GitHub 创建 run（通常需要几秒）
-            delay(5000)
-
-            // ========== Step 4: 获取最新 run 并轮询 ==========
-            val newRun = cloudBuildRepository.getLatestRun(token).getOrNull()
             if (newRun == null) {
                 callback?.onProgress(BuildProgress("failed", "❌ 无法获取编译状态"))
                 return "无法获取编译运行状态"
@@ -191,7 +181,9 @@ class CloudBuildTool @Inject constructor(
             }
 
             val downloadResult = cloudBuildRepository.downloadApkToLocal(
-                context.applicationContext, token, artifact.id
+                context.applicationContext, token, artifact.id,
+                runId = runId,
+                releaseTag = "latest-user-apk"
             )
 
             if (downloadResult.isFailure) {

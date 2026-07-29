@@ -29,7 +29,7 @@ object Constants {
     const val KEY_MOONSHOT_API_KEY = "moonshot_api_key"
 
     // ============ Zhipu AI (智谱) ============
-    const val ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/pas/v4/"
+    const val ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
     const val KEY_ZHIPU_API_KEY = "zhipu_api_key"
 
     // ============ 视觉模型 ============
@@ -74,9 +74,10 @@ object Constants {
     const val GITHUB_REPO_OWNER = "abuaibobo-dev"
     const val GITHUB_REPO_NAME = "xiaonaodai-android"
     const val GITHUB_WORKFLOW_ID = "build.yml"
+    const val GITHUB_USER_PROJECT_WORKFLOW_ID = "user-project-build.yml"
     const val GITHUB_POLL_INTERVAL_MS = 15000L
 
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "5.0.5"
-    const val APP_VERSION_CODE = 55
+    const val APP_VERSION = "5.0.3"
+    const val APP_VERSION_CODE = 53
 }
