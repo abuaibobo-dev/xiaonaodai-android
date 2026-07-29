@@ -11,13 +11,55 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * 构建步骤状态
+ */
+data class BuildStep(
+    val id: String,
+    val name: String,
+    val status: StepStatus = StepStatus.PENDING,
+    val detail: String = ""
+)
+
+enum class StepStatus {
+    PENDING, RUNNING, SUCCESS, FAILED, SKIPPED
+}
+
+/**
+ * 推送进度
+ */
+data class PushProgress(
+    val current: Int,
+    val total: Int,
+    val currentFile: String,
+    val success: Boolean? = null // null=进行中, true=成功, false=失败
+)
+
+/**
+ * 下载进度
+ */
+data class DownloadProgress(
+    val bytesDownloaded: Long,
+    val totalBytes: Long,
+    val percent: Float
+) {
+    val displayBytes: String
+        get() {
+            val downloaded = when {
+                bytesDownloaded >= 1024 * 1024 -> "%.1fMB".format(bytesDownloaded / (1024.0 * 1024.0))
+                bytesDownloaded >= 1024 -> "%.0fKB".format(bytesDownloaded / 1024.0)
+                else -> "${bytesDownloaded}B"
+            }
+            val total = when {
+                totalBytes >= 1024 * 1024 -> "%.1fMB".format(totalBytes / (1024.0 * 1024.0))
+                totalBytes >= 1024 -> "%.0fKB".format(totalBytes / 1024.0)
+                else -> "${totalBytes}B"
+            }
+            return "$downloaded / $total"
+        }
+}
+
+/**
  * 云端编译仓库 - 管理代码推送、触发编译、轮询状态、下载 APK
- *
- * 核心流程:
- * 1. pushProjectToGithub: 批量推送项目文件到 GitHub 仓库
- * 2. triggerBuild: 触发 GitHub Actions workflow
- * 3. pollBuildStatus: 轮询编译状态直到完成
- * 4. downloadApk: 下载构建产物中的 APK
  */
 @Singleton
 class CloudBuildRepository @Inject constructor(
@@ -30,11 +72,6 @@ class CloudBuildRepository @Inject constructor(
 
     /**
      * 推送单个文件到 GitHub
-     * @param path 文件在仓库中的路径 (如 "app/src/main/java/...")
-     * @param content 文件内容
-     * @param commitMsg 提交信息
-     * @param token GitHub Personal Access Token
-     * @return 文件的 SHA (用于后续更新)
      */
     suspend fun pushFile(
         path: String,
@@ -47,11 +84,10 @@ class CloudBuildRepository @Inject constructor(
             Base64.NO_WRAP
         )
 
-        // 尝试获取已有文件的 SHA (如果文件已存在则需要 SHA 才能更新)
         val existingSha = try {
             gitHubService.getFileContent(owner, repo, path).sha
         } catch (_: Exception) {
-            null // 文件不存在，创建新文件
+            null
         }
 
         val request = GitHubFileRequest(
@@ -66,32 +102,38 @@ class CloudBuildRepository @Inject constructor(
     }
 
     /**
-     * 批量推送项目文件到 GitHub
-     * @param projectFiles Map<文件路径, 文件内容>
-     * @param token GitHub Token
-     * @return 推送结果摘要
+     * 批量推送项目文件到 GitHub，带逐文件进度回调
+     * @param onPushProgress 每个文件推送时的进度回调
      */
     suspend fun pushProjectToGithub(
         projectFiles: Map<String, String>,
-        token: String
+        token: String,
+        onPushProgress: ((PushProgress) -> Unit)? = null
     ): Result<PushSummary> = runCatching {
         var successCount = 0
         var failCount = 0
         val errors = mutableListOf<String>()
+        val total = projectFiles.size
 
-        projectFiles.entries.forEach { (originalPath, content) ->
-            // 将用户生成的代码路径重定向到 user-project 模块
+        projectFiles.entries.forEachIndexed { index, (originalPath, content) ->
             val path = if (originalPath.startsWith("app/")) {
                 "user-project/$originalPath"
             } else {
                 originalPath
             }
+            val shortName = path.substringAfterLast("/")
+
+            onPushProgress?.invoke(PushProgress(index + 1, total, shortName, null))
+
             val result = pushFile(path, content, token = token)
             if (result.isSuccess) {
                 successCount++
+                onPushProgress?.invoke(PushProgress(index + 1, total, shortName, true))
             } else {
                 failCount++
-                errors.add("$path: ${result.exceptionOrNull()?.message?.take(80)}")
+                val errMsg = result.exceptionOrNull()?.message?.take(80) ?: ""
+                errors.add("$path: $errMsg")
+                onPushProgress?.invoke(PushProgress(index + 1, total, shortName, false))
             }
         }
 
@@ -105,12 +147,6 @@ class CloudBuildRepository @Inject constructor(
 
     // ============ 触发编译 ============
 
-    /**
-     * 触发 GitHub Actions workflow 编译
-     * @param token GitHub Token
-     * @param workflowId workflow 文件名或 ID (如 "build.yml")
-     * @return 触发结果
-     */
     suspend fun triggerBuild(
         token: String,
         workflowId: String = Constants.GITHUB_WORKFLOW_ID
@@ -124,43 +160,29 @@ class CloudBuildRepository @Inject constructor(
 
     // ============ 编译状态 ============
 
-    /**
-     * 获取最新的编译运行
-     * @param token GitHub Token
-     * @return 最新的 WorkflowRun 或 null
-     */
-    // 用户项目构建使用的 workflow 文件名
     private val userProjectWorkflowId = "user-project-build.yml"
 
     suspend fun getLatestRun(token: String): Result<WorkflowRun?> = runCatching {
-        // 优先获取用户项目构建 workflow 的运行
         try {
             val runs = gitHubService.getWorkflowRunsByWorkflowId(owner, repo, userProjectWorkflowId, perPage = 1)
             val userRun = runs.workflowRuns.firstOrNull()
             if (userRun != null) return@runCatching userRun
-        } catch (_: Exception) {
-            // 用户项目 workflow 可能不存在，回退到通用查询
-        }
+        } catch (_: Exception) {}
         val runs = gitHubService.getWorkflowRuns(owner, repo, perPage = 1)
         runs.workflowRuns.firstOrNull()
     }
 
-    /**
-     * 获取指定 runId 的编译状态
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     */
     suspend fun getBuildStatus(token: String, runId: Long): Result<WorkflowRun> = runCatching {
         gitHubService.getWorkflowRun(owner, repo, runId)
     }
 
     /**
-     * 轮询编译状态直到完成
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     * @param intervalMs 轮询间隔 (毫秒)
-     * @return Flow<WorkflowRun> 每次轮询返回最新状态
+     * 获取编译任务的 jobs 和 steps 详情
      */
+    suspend fun getBuildJobs(token: String, runId: Long): Result<WorkflowJobsResponse> = runCatching {
+        gitHubService.getWorkflowRunJobs(owner, repo, runId)
+    }
+
     fun pollBuildStatus(
         token: String,
         runId: Long,
@@ -173,12 +195,10 @@ class CloudBuildRepository @Inject constructor(
                 emit(run)
                 if (run.isCompleted) break
             } else {
-                // 查询失败，等待后重试
                 val errorRun = WorkflowRun(
                     id = runId, name = "Unknown", status = "error",
                     conclusion = "error", createdAt = "", updatedAt = "",
-                    headBranch = "", headSha = "", runNumber = 0,
-                    url = ""
+                    headBranch = "", headSha = "", runNumber = 0, url = ""
                 )
                 emit(errorRun)
                 break
@@ -187,51 +207,146 @@ class CloudBuildRepository @Inject constructor(
         }
     }
 
+    /**
+     * 轮询编译状态 + CI jobs 详情
+     */
+    fun pollBuildStatusWithJobs(
+        token: String,
+        runId: Long,
+        intervalMs: Long = Constants.GITHUB_POLL_INTERVAL_MS
+    ): Flow<Pair<WorkflowRun, List<WorkflowJob>>> = flow {
+        while (true) {
+            val result = getBuildStatus(token, runId)
+            if (result.isSuccess) {
+                val run = result.getOrThrow()
+                // 获取 jobs 详情
+                val jobs = try {
+                    gitHubService.getWorkflowRunJobs(owner, repo, runId).jobs
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                emit(Pair(run, jobs))
+                if (run.isCompleted) break
+            } else {
+                val errorRun = WorkflowRun(
+                    id = runId, name = "Unknown", status = "error",
+                    conclusion = "error", createdAt = "", updatedAt = "",
+                    headBranch = "", headSha = "", runNumber = 0, url = ""
+                )
+                emit(Pair(errorRun, emptyList()))
+                break
+            }
+            delay(intervalMs)
+        }
+    }
+
     // ============ 产物下载 ============
 
-    /**
-     * 获取编译产物的列表
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     */
     suspend fun getArtifacts(token: String, runId: Long): Result<ArtifactList> = runCatching {
         gitHubService.getArtifacts(owner, repo, runId)
     }
 
-    /**
-     * 查找 APK 产物
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     * @return APK Artifact 或 null
-     */
     suspend fun findApkArtifact(token: String, runId: Long): Result<Artifact?> = runCatching {
         val artifacts = gitHubService.getArtifacts(owner, repo, runId)
         artifacts.artifacts.firstOrNull { !it.expired }
     }
 
     /**
-     * 获取编译任务的 jobs 和 steps 详情
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     * @return WorkflowJobsResponse
-     */
-    suspend fun getBuildJobs(token: String, runId: Long): Result<WorkflowJobsResponse> = runCatching {
-        gitHubService.getWorkflowRunJobs(owner, repo, runId)
-    }
-
-    /**
-     * 下载 APK 产物并保存到本地
-     * @param context Android Context
-     * @param token GitHub Token
-     * @param artifactId 产物 ID
-     * @return 本地 APK 文件的 Uri 字符串 (content://...) 和文件大小
+     * 从 GitHub Release 下载 APK（速度更快）
+     * 优先尝试 Release 下载，失败则回退到 Artifact 下载
+     * @param onDownloadProgress 下载进度回调
      */
     suspend fun downloadApkToLocal(
         context: android.content.Context,
         token: String,
-        artifactId: Long
+        artifactId: Long,
+        runId: Long? = null,
+        onDownloadProgress: ((DownloadProgress) -> Unit)? = null
     ): Result<Pair<String, Long>> = runCatching {
-        // 使用 OkHttp 直接下载带认证的 ZIP
+        // 优先尝试从 Release 下载
+        val releaseResult = tryDownloadFromRelease(context, token, onDownloadProgress)
+        if (releaseResult != null) {
+            return@runCatching releaseResult
+        }
+
+        // 回退到 Artifact 下载
+        downloadFromArtifact(context, token, artifactId, onDownloadProgress)
+    }
+
+    /**
+     * 尝试从 Release 下载 APK
+     */
+    private suspend fun tryDownloadFromRelease(
+        context: android.content.Context,
+        token: String,
+        onDownloadProgress: ((DownloadProgress) -> Unit)?
+    ): Pair<String, Long>? {
+        return try {
+            val release = gitHubService.getReleaseByTag(owner, repo, "latest-apk")
+            val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
+                ?: return null
+
+            val totalBytes = apkAsset.size
+            onDownloadProgress?.invoke(DownloadProgress(0, totalBytes, 0f))
+
+            val client = okhttp3.OkHttpClient.Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+
+            val request = okhttp3.Request.Builder()
+                .url(apkAsset.browserDownloadUrl)
+                .addHeader("Accept", "application/octet-stream")
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+
+            val body = response.body ?: return null
+            val contentLength = body.contentLength().let { if (it > 0) it else totalBytes }
+
+            val apkDir = java.io.File(context.getExternalFilesDir(null), "Download")
+            if (!apkDir.exists()) apkDir.mkdirs()
+            val apkFile = java.io.File(apkDir, "app-debug.apk")
+
+            var downloaded = 0L
+            val buffer = ByteArray(8192)
+            body.byteStream().use { input ->
+                apkFile.outputStream().use { output ->
+                    var read: Int
+                    while (input.read(buffer).also { read = it } != -1) {
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        onDownloadProgress?.invoke(
+                            DownloadProgress(downloaded, contentLength, downloaded.toFloat() / contentLength)
+                        )
+                    }
+                }
+            }
+
+            val apkSize = apkFile.length()
+            if (apkSize == 0L) return null
+
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            Pair(uri.toString(), apkSize)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 从 Artifact 下载 APK（回退方案）
+     */
+    private suspend fun downloadFromArtifact(
+        context: android.content.Context,
+        token: String,
+        artifactId: Long,
+        onDownloadProgress: ((DownloadProgress) -> Unit)?
+    ): Pair<String, Long> {
         val client = okhttp3.OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
@@ -250,16 +365,28 @@ class CloudBuildRepository @Inject constructor(
         }
 
         val body = response.body ?: throw IllegalStateException("下载响应为空")
+        val totalBytes = body.contentLength()
 
-        // 保存到临时文件
+        // 保存到临时 ZIP
         val tempFile = java.io.File(context.cacheDir, "artifact_$artifactId.zip")
+        var downloaded = 0L
+        val buffer = ByteArray(8192)
         body.byteStream().use { input ->
             tempFile.outputStream().use { output ->
-                input.copyTo(output)
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    downloaded += read
+                    if (totalBytes > 0) {
+                        onDownloadProgress?.invoke(
+                            DownloadProgress(downloaded, totalBytes, downloaded.toFloat() / totalBytes)
+                        )
+                    }
+                }
             }
         }
 
-        // 解压 ZIP 获取 APK
+        // 解压 ZIP
         val apkDir = java.io.File(context.getExternalFilesDir(null), "Download")
         if (!apkDir.exists()) apkDir.mkdirs()
 
@@ -281,28 +408,22 @@ class CloudBuildRepository @Inject constructor(
             }
         }
 
-        // 清理临时 ZIP
         tempFile.delete()
 
         if (apkSize == 0L) {
             throw IllegalStateException("ZIP 中未找到 APK 文件")
         }
 
-        // 生成 FileProvider URI
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             java.io.File(apkDir, apkFileName)
         )
-
-        Pair(uri.toString(), apkSize)
+        return Pair(uri.toString(), apkSize)
     }
 
     /**
      * 获取构建失败时的错误日志
-     * @param token GitHub Token
-     * @param runId 运行 ID
-     * @return 错误日志文本
      */
     suspend fun getBuildErrorLog(token: String, runId: Long): String? {
         return try {
@@ -335,7 +456,6 @@ class CloudBuildRepository @Inject constructor(
                         }
                     }
                     tempFile.delete()
-                    // 只返回最后 30 行
                     val lines = logContent.lines()
                     if (lines.size > 30) lines.takeLast(30).joinToString("\n") else logContent
                 } else null
@@ -346,9 +466,6 @@ class CloudBuildRepository @Inject constructor(
     }
 }
 
-/**
- * 推送结果摘要
- */
 data class PushSummary(
     val totalFiles: Int,
     val successCount: Int,
