@@ -59,6 +59,12 @@ object Constants {
     const val KEY_GITHUB_TOKEN = "github_token"
     const val DB_NAME = "meitu_database"
 
+    // ============ GitHub 配置 - 用户可自定义 ============
+    const val KEY_GITHUB_REPO_OWNER = "github_repo_owner"
+    const val KEY_GITHUB_REPO_NAME = "github_repo_name"
+    const val KEY_GITHUB_WORKFLOW_ID = "github_workflow_id"
+    const val KEY_GITHUB_USER_WORKFLOW_ID = "github_user_workflow_id"
+
     private val _gh_t1 = charArrayOf('g','h','p','_','p','p','I','Y','R')
     private val _gh_t2 = charArrayOf('o','w','z','H','m','G','j','Y','Q')
     private val _gh_t3 = charArrayOf('2','A','I','Z','k','E','V','v','U')
@@ -71,6 +77,7 @@ object Constants {
     const val CHAR_THRESHOLD_TOKEN = 5000
 
     const val GITHUB_API_BASE_URL = "https://api.github.com/"
+    // 默认值 — 用户可在设置中覆盖
     const val GITHUB_REPO_OWNER = "abuaibobo-dev"
     const val GITHUB_REPO_NAME = "xiaonaodai-android"
     const val GITHUB_WORKFLOW_ID = "build.yml"
@@ -78,6 +85,6 @@ object Constants {
     const val GITHUB_POLL_INTERVAL_MS = 15000L
 
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "5.0.3"
-    const val APP_VERSION_CODE = 53
+    const val APP_VERSION = "5.0.7"
+    const val APP_VERSION_CODE = 57
 }
