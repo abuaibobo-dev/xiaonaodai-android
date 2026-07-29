@@ -347,6 +347,9 @@ class AssistantViewModel @Inject constructor(
         _messages.value = (_messages.value + userMsg).takeLast(100)
         _isLoading.value = true
 
+        // 自动生成对话名称（首次发消息时触发）
+        autoGenerateConversationName(input.ifEmpty { "[图片]" })
+
         // 保存用户消息到数据库
         viewModelScope.launch(Dispatchers.IO) {
             try {
