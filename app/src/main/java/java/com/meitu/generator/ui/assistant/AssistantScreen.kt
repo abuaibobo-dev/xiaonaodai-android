@@ -346,7 +346,7 @@ fun AssistantScreen(
 
         // ============ 输入区域（集成模型切换+模式切换+发送） ============
         val brainModel by viewModel.brainModel.collectAsState()
-        val availableBrainModels = viewModel.availableBrainModels
+        val configuredBrainModels = viewModel.configuredBrainModels
         var showModelDropdown by remember { mutableStateOf(false) }
 
         Box(modifier = Modifier.imePadding()) {
@@ -357,7 +357,7 @@ fun AssistantScreen(
             deepThinking = deepThinking,
             webSearch = webSearch,
             currentModel = brainModel,
-            availableModels = availableBrainModels,
+            availableModels = configuredBrainModels,
             showModelDropdown = showModelDropdown,
             onInputChange = { viewModel.setInput(it) },
             onSend = { viewModel.sendInput() },
@@ -366,8 +366,13 @@ fun AssistantScreen(
             onToggleWebSearch = { viewModel.toggleWebSearch() },
             onToggleModelDropdown = { showModelDropdown = !showModelDropdown },
             onSelectModel = { model ->
-                viewModel.switchBrainModel(model)
-                showModelDropdown = false
+                if (model == "__config__") {
+                    showModelDropdown = false
+                    AppEvents.emit("navigate_settings")
+                } else {
+                    viewModel.switchBrainModel(model)
+                    showModelDropdown = false
+                }
             }
             )
         }
@@ -681,6 +686,23 @@ private fun SmartInputBar(
                             onClick = { onSelectModel(model) }
                         )
                     }
+                    // 分隔线 + 配置入口
+                    Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = colors.textTertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("配置更多模型…", fontSize = 13.sp, color = colors.textTertiary)
+                            }
+                        },
+                        onClick = { onSelectModel("__config__") }
+                    )
                 }
             }
         }
@@ -872,26 +894,44 @@ private fun TextMessageBubble(
                     }
                 }
                 
-                // AI消息的复制按钮
-                if (!msg.isUser && !msg.isSystem && visibleTextLength >= fullTextLength) {
-                    val context = LocalContext.current
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("message", msg.text)
-                                    clipboard.setPrimaryClip(clip)
-                                    android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(4.dp)
-                        ) {
-                            Text("📋 复制", fontSize = 11.sp, color = colors.textTertiary)
+                // 内容区域结束
+            }
+        }
+        
+        // AI消息的复制按钮 —— 放在气泡外部左下角
+        if (!msg.isUser && !msg.isSystem && visibleTextLength >= fullTextLength) {
+            val context = LocalContext.current
+            var copied by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .padding(start = 4.dp, top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("message", msg.text)
+                            clipboard.setPrimaryClip(clip)
+                            copied = true
+                            android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
                         }
+                        .padding(4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "复制",
+                            tint = if (copied) colors.accent else colors.textTertiary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (copied) "已复制" else "复制",
+                            fontSize = 11.sp,
+                            color = if (copied) colors.accent else colors.textTertiary
+                        )
                     }
                 }
             }

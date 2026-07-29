@@ -112,6 +112,42 @@ class AssistantViewModel @Inject constructor(
     val brainModel: StateFlow<String> = _currentModel.asStateFlow()
     val availableBrainModels = Constants.AVAILABLE_MODELS
 
+    /** 已配置API Key的模型列表（按供应商过滤） */
+    val configuredBrainModels: List<String>
+        get() {
+            val configured = mutableListOf("auto") // auto始终可用
+            val supplierModelMap = mapOf(
+                "deepseek" to listOf("deepseek-chat", "deepseek-reasoner"),
+                "google" to listOf("gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"),
+                "openai" to listOf("gpt-4o", "gpt-4o-mini"),
+                "groq" to listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
+                "siliconflow" to listOf("deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"),
+                "moonshot" to listOf("moonshot-v1-8k", "moonshot-v1-32k"),
+                "zhipu" to listOf("glm-4-flash", "glm-4")
+            )
+            val keyMap = mapOf(
+                "deepseek" to Constants.KEY_AI_API_KEY,
+                "google" to Constants.KEY_GOOGLE_API_KEY,
+                "openai" to Constants.KEY_OPENAI_API_KEY,
+                "groq" to Constants.KEY_GROQ_API_KEY,
+                "siliconflow" to Constants.KEY_SILICONFLOW_API_KEY,
+                "moonshot" to Constants.KEY_MOONSHOT_API_KEY,
+                "zhipu" to Constants.KEY_ZHIPU_API_KEY
+            )
+            // DeepSeek始终可用（有内置Key）
+            configured.addAll(supplierModelMap["deepseek"]!!)
+            // 检查其他供应商
+            for ((supplier, models) in supplierModelMap) {
+                if (supplier == "deepseek") continue
+                val key = keyMap[supplier] ?: continue
+                val savedKey = securePrefs.getString(key, "") ?: ""
+                if (savedKey.isNotBlank()) {
+                    configured.addAll(models)
+                }
+            }
+            return configured
+        }
+
     // ============ Loading ============
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
