@@ -3,7 +3,8 @@ package com.meitu.generator.di
 import android.content.Context
 import androidx.room.Room
 import com.meitu.generator.data.local.AppDatabase
-import com.meitu.generator.data.local.dao.*
+import com.meitu.generator.data.local.dao.ChatMessageDao
+import com.meitu.generator.data.local.dao.SettingsDao
 import com.meitu.generator.util.Constants
 import dagger.Module
 import dagger.Provides
@@ -27,9 +28,5 @@ object DatabaseModule {
     }
 
     @Provides fun provideSettingsDao(db: AppDatabase): SettingsDao = db.settingsDao()
-    @Provides fun provideLogDao(db: AppDatabase): LogDao = db.logDao()
-    @Provides fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
-    @Provides fun provideMemoryDao(db: AppDatabase): MemoryDao = db.memoryDao()
-    @Provides fun providePlanDao(db: AppDatabase): PlanDao = db.planDao()
     @Provides fun provideChatMessageDao(db: AppDatabase): ChatMessageDao = db.chatMessageDao()
 }

@@ -3,20 +3,15 @@ package com.meitu.generator.ui.assistant
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.meitu.generator.data.agent.ThinkingChainManager
 import com.meitu.generator.ui.AppEvents
 import com.meitu.generator.ui.theme.LocalAppColors
 import kotlinx.coroutines.delay
@@ -79,7 +73,7 @@ private fun extractFileNameFromCode(code: String, lang: String): String? {
     if (packageMatch != null) {
         val classMatch = Regex("(?:class|object|interface)\\s+(\\w+)").find(code)
         if (classMatch != null) return "${classMatch.groupValues[1]}.$lang"
-        return "${packageMatch.groupValues[1].substringAfterLast(".")}.$lang"
+        return "${packageMatch.groupValues[1].substringAfterLast(".")}. $lang"
     }
     return null
 }
@@ -146,48 +140,6 @@ private fun CodeBlockCard(language: String, code: String, fileName: String?) {
     }
 }
 
-// ============ 深度思考展示卡片 ============
-@Composable
-private fun ReasoningCard(reasoning: String) {
-    val colors = LocalAppColors.current
-    var expanded by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF1A1A2E))
-            .border(0.5.dp, Color(0xFF3A3A5E), RoundedCornerShape(10.dp))
-            .clickable { expanded = !expanded }
-            .padding(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("💭", fontSize = 14.sp)
-            Spacer(Modifier.width(6.dp))
-            Text("深度思考过程", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color(0xFF9B9BCC))
-            Spacer(Modifier.weight(1f))
-            Text(if (expanded) "收起" else "展开", fontSize = 11.sp, color = Color(0xFF7A7AAA))
-        }
-        if (expanded) {
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 200.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = reasoning,
-                    fontSize = 12.sp,
-                    color = Color(0xFFB0B0D0),
-                    lineHeight = 18.sp,
-                    fontFamily = FontFamily.Serif
-                )
-            }
-        }
-    }
-}
-
 // ============ 主屏幕 ============
 @Composable
 fun AssistantScreen(
@@ -197,21 +149,15 @@ fun AssistantScreen(
     val messages by viewModel.messages.collectAsState()
     val inputText by viewModel.inputText.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val agentStatus by viewModel.agentStatus.collectAsState()
-    val animatedMessageIds = viewModel.animatedMessageIds
     val pendingImageUri by viewModel.pendingImageUri.collectAsState()
-    val deepThinking by viewModel.deepThinkingEnabled.collectAsState()
-    val webSearch by viewModel.webSearchEnabled.collectAsState()
+    val statusMessage by viewModel.statusMessage.collectAsState()
+    val isCozeConfigured by viewModel.isCozeConfigured.collectAsState()
     val listState = rememberLazyListState()
-
-    val thinkingChain by viewModel.thinkingChain.collectAsState()
-    val isThinkingActive by viewModel.isThinkingChainActive.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
 
     LaunchedEffect(Unit) {
         AppEvents.events.collect { event ->
             when (event) {
-                "clear_chat" -> viewModel.clearMessages()
+                "clear_chat" -> viewModel.clearCurrentChat()
                 "new_chat" -> viewModel.newConversation()
             }
         }
@@ -219,19 +165,19 @@ fun AssistantScreen(
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? -> uri?.let { viewModel.setPendingImage(it.toString()) } }
+    ) { uri: Uri? -> uri?.let { viewModel.setPendingImageUri(it.toString()) } }
 
     val lastMessageId = messages.lastOrNull()?.id
     val lastMessageText = messages.lastOrNull()?.text
     val lastMessageLen = lastMessageText?.length ?: 0
-    
-    // 综合滚动触发器：消息变化、状态变化、内容更新都触发滚动
+
+    // 综合滚动触发器
     val scrollTrigger by remember {
         derivedStateOf {
             Triple(lastMessageId, isLoading, lastMessageLen)
         }
     }
-    
+
     LaunchedEffect(scrollTrigger) {
         if (messages.isNotEmpty()) {
             delay(80)
@@ -241,30 +187,9 @@ fun AssistantScreen(
             }
         }
     }
-    
-    // agentStatus 变化时也滚动
-    LaunchedEffect(agentStatus) {
-        if (agentStatus != null && messages.isNotEmpty()) {
-            delay(50)
-            val totalItems = listState.layoutInfo.totalItemsCount
-            if (totalItems > 0) {
-                try { listState.animateScrollToItem(totalItems - 1, scrollOffset = 0) } catch (_: Exception) {}
-            }
-        }
-    }
-    
-    // 思维链更新时也滚动
-    LaunchedEffect(thinkingChain) {
-        if (isThinkingActive && messages.isNotEmpty()) {
-            val totalItems = listState.layoutInfo.totalItemsCount
-            if (totalItems > 0) {
-                try { listState.animateScrollToItem(totalItems - 1, scrollOffset = 0) } catch (_: Exception) {}
-            }
-        }
-    }
 
-    // 判断是否为空对话（用于布局切换）
-    val isEmptyConversation = (messages.isEmpty() || (messages.size <= 1 && messages.all { it.isSystem })) && !isLoading
+    // 判断是否为空对话
+    val isEmptyConversation = (messages.isEmpty() || (messages.size <= 1 && messages.all { !it.isUser })) && !isLoading
 
     Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
         if (isEmptyConversation) {
@@ -285,19 +210,11 @@ fun AssistantScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages, key = { it.id }) { msg ->
-                        when {
-                            msg.isSystem -> SystemMessageBubble(msg.text)
-                            msg.taskProgress != null -> TaskProgressBubble(msg)
-                            else -> TextMessageBubble(msg, animatedMessageIds, viewModel)
-                        }
+                        TextMessageBubble(msg)
                     }
 
-                    if (agentStatus != null) {
-                        item { AgentStatusBubble(status = agentStatus!!) }
-                    }
-
-                    if (isLoading && agentStatus == null) {
-                        item { ThinkingChainIndicator(thinkingChain = thinkingChain, isActive = isThinkingActive) }
+                    if (isLoading) {
+                        item { LoadingIndicator(statusMessage) }
                     }
 
                     item { Spacer(Modifier.height(8.dp)) }
@@ -344,111 +261,20 @@ fun AssistantScreen(
 
         // ============ 图片预览区 ============
         if (pendingImageUri != null) {
-            ImagePreview(imageUri = pendingImageUri!!, onRemove = { viewModel.removePendingImage() })
+            ImagePreview(imageUri = pendingImageUri!!, onRemove = { viewModel.setPendingImageUri(null) })
         }
 
-        // ============ 输入区域（集成模型切换+模式切换+发送） ============
-        val brainModel by viewModel.brainModel.collectAsState()
-        val configuredBrainModels = viewModel.configuredBrainModels
-        var showModelDropdown by remember { mutableStateOf(false) }
-        val eventScope = rememberCoroutineScope()
-
+        // ============ 输入区域 ============
         Box(modifier = Modifier.imePadding()) {
-            SmartInputBar(
-            inputText = inputText,
-            isLoading = isLoading,
-            pendingImageUri = pendingImageUri,
-            deepThinking = deepThinking,
-            webSearch = webSearch,
-            currentModel = brainModel,
-            availableModels = configuredBrainModels,
-            showModelDropdown = showModelDropdown,
-            onInputChange = { viewModel.setInput(it) },
-            onSend = { viewModel.sendInput() },
-            onPickImage = { imagePickerLauncher.launch("image/*") },
-            onToggleDeepThinking = { viewModel.toggleDeepThinking() },
-            onToggleWebSearch = { viewModel.toggleWebSearch() },
-            onToggleModelDropdown = { showModelDropdown = !showModelDropdown },
-            onSelectModel = { model ->
-                if (model == "__config__") {
-                    showModelDropdown = false
-                    eventScope.launch { AppEvents.send("navigate_settings") }
-                } else {
-                    viewModel.switchBrainModel(model)
-                    showModelDropdown = false
-                }
-            }
+            ChatInputBar(
+                inputText = inputText,
+                isLoading = isLoading,
+                pendingImageUri = pendingImageUri,
+                isCozeConfigured = isCozeConfigured,
+                onInputChange = { viewModel.setInputText(it) },
+                onSend = { viewModel.sendMessage() },
+                onPickImage = { imagePickerLauncher.launch("image/*") }
             )
-        }
-    }
-
-    // P0修复：错误提示 Snackbar（不混入聊天流）
-    if (errorMessage != null) {
-        LaunchedEffect(errorMessage) {
-            kotlinx.coroutines.delay(3500)
-            viewModel.clearErrorMessage()
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFFF4444).copy(alpha = 0.92f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(errorMessage ?: "", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-}
-
-// ============ 模式 Chip（嵌入输入框工具栏） ============
-@Composable
-private fun SmartModeChip(
-    icon: String,
-    label: String,
-    active: Boolean,
-    activeColor: Color,
-    onClick: () -> Unit
-) {
-    val colors = LocalAppColors.current
-    val bgColor by animateColorAsState(
-        if (active) activeColor.copy(alpha = 0.15f) else Color.Transparent,
-        animationSpec = tween(200), label = "chipBg"
-    )
-    val borderColor by animateColorAsState(
-        if (active) activeColor.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.5f),
-        animationSpec = tween(200), label = "chipBorder"
-    )
-    val textColor by animateColorAsState(
-        if (active) activeColor else colors.textTertiary,
-        animationSpec = tween(200), label = "chipText"
-    )
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .border(0.5.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, fontSize = 11.sp)
-            Spacer(Modifier.width(3.dp))
-            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = textColor)
-            if (active) {
-                Spacer(Modifier.width(2.dp))
-                Box(
-                    modifier = Modifier.size(4.dp).clip(CircleShape).background(activeColor)
-                )
-            }
         }
     }
 }
@@ -466,7 +292,6 @@ private fun EmptyState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Logo
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -484,240 +309,20 @@ private fun EmptyState() {
             Spacer(Modifier.height(8.dp))
 
             Text("布老师", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-            Text("你的AI编程助手", fontSize = 14.sp, color = colors.textTertiary)
+            Text("你的专属 AI 助手", fontSize = 14.sp, color = colors.textTertiary)
 
             Spacer(Modifier.height(24.dp))
 
-            Text("所有对话都会被记忆，我会越用越懂你 💡", fontSize = 12.sp, color = colors.textTertiary)
+            Text("有什么想法直接说，我来帮你 💡", fontSize = 12.sp, color = colors.textTertiary)
         }
     }
 }
 
-// ============ 智能输入栏（所有控件集成在输入框内） ============
+// ============ 加载指示器 ============
 @Composable
-private fun SmartInputBar(
-    inputText: String,
-    isLoading: Boolean,
-    pendingImageUri: String?,
-    deepThinking: Boolean,
-    webSearch: Boolean,
-    currentModel: String,
-    availableModels: List<String>,
-    showModelDropdown: Boolean,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onPickImage: () -> Unit,
-    onToggleDeepThinking: () -> Unit,
-    onToggleWebSearch: () -> Unit,
-    onToggleModelDropdown: () -> Unit,
-    onSelectModel: (String) -> Unit
-) {
+private fun LoadingIndicator(statusMessage: String?) {
     val colors = LocalAppColors.current
-    val canSend = (inputText.isNotBlank() || pendingImageUri != null) && !isLoading
-    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            // 顶部分割线
-            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-
-            // 输入区域主体
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.background)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                // 输入框主体 - 圆角卡片
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(colors.surface)
-                        .border(0.5.dp, colors.border, RoundedCornerShape(20.dp))
-                ) {
-                    Column {
-                        // 文本输入区域 - 自适应高度
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp, max = 140.dp)
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = inputText,
-                                onValueChange = onInputChange,
-                                textStyle = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 15.sp,
-                                    color = colors.textPrimary,
-                                    lineHeight = 22.sp
-                                ),
-                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
-                                decorationBox = { innerTextField ->
-                                    Box {
-                                        if (inputText.isEmpty() && pendingImageUri == null) {
-                                            androidx.compose.foundation.text.BasicText(
-                                                text = "说点什么...",
-                                                style = androidx.compose.ui.text.TextStyle(
-                                                    fontSize = 15.sp,
-                                                    color = colors.textTertiary,
-                                                    lineHeight = 22.sp
-                                                )
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                        }
-
-                        // 底部分割线（仅在输入框内）
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .height(0.5.dp)
-                                .background(colors.border.copy(alpha = 0.4f))
-                        )
-
-                        // 底部工具栏
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // 左侧工具按钮
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // 模型选择
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onToggleModelDropdown() }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🤖", fontSize = 13.sp)
-                                        Spacer(Modifier.width(3.dp))
-                                        Text(
-                                            com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(currentModel),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = colors.textSecondary,
-                                            maxLines = 1
-                                        )
-                                        Text(" ▾", fontSize = 10.sp, color = colors.textTertiary)
-                                    }
-                                }
-
-                                // 思考模式
-                                SmartModeChip(
-                                    icon = "🧠", label = "思考", active = deepThinking,
-                                    activeColor = Color(0xFF6C5CE7), onClick = onToggleDeepThinking
-                                )
-                                // 联网搜索
-                                SmartModeChip(
-                                    icon = "🌐", label = "搜索", active = webSearch,
-                                    activeColor = Color(0xFF00B894), onClick = onToggleWebSearch
-                                )
-                                // 附件
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
-                                        .clickable { onPickImage() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("📎", fontSize = 14.sp)
-                                }
-                            }
-
-                            // 右侧发送按钮
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(if (canSend) colors.accent else colors.border.copy(alpha = 0.3f))
-                                    .clickable(enabled = canSend) { onSend() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = "发送",
-                                    tint = if (canSend) Color.White else colors.textTertiary,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 模型选择下拉菜单
-        if (showModelDropdown) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 80.dp)
-            ) {
-                DropdownMenu(
-                    expanded = showModelDropdown,
-                    onDismissRequest = { onToggleModelDropdown() },
-                    modifier = Modifier.background(colors.surface)
-                ) {
-                    availableModels.forEach { model ->
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        com.meitu.generator.data.agent.ModelRouter.getModelDisplayName(model),
-                                        fontSize = 14.sp,
-                                        color = colors.textPrimary
-                                    )
-                                    if (model == currentModel) {
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("✓", fontSize = 14.sp, color = colors.accent, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            },
-                            onClick = { onSelectModel(model) }
-                        )
-                    }
-                    // 分隔线 + 配置入口
-                    Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = null,
-                                    tint = colors.textTertiary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text("配置更多模型…", fontSize = 13.sp, color = colors.textTertiary)
-                            }
-                        },
-                        onClick = { onSelectModel("__config__") }
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ============ Agent 实时状态气泡 ============
-@Composable
-private fun AgentStatusBubble(status: String) {
-    val colors = LocalAppColors.current
-    val infiniteTransition = rememberInfiniteTransition(label = "status")
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f, targetValue = 1f,
         animationSpec = infiniteRepeatable(animation = tween(800, easing = EaseInOutSine), repeatMode = RepeatMode.Reverse),
@@ -728,70 +333,20 @@ private fun AgentStatusBubble(status: String) {
         Box(
             modifier = Modifier
                 .widthIn(max = 240.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(colors.surface.copy(alpha = 0.6f))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp))
+                .background(colors.messageAiBg)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier.size(6.dp).clip(CircleShape).alpha(pulseAlpha).background(colors.accent)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(status, fontSize = 13.sp, color = colors.textSecondary)
-            }
-        }
-    }
-}
-
-// ============ 思维链指示器 ============
-@Composable
-private fun ThinkingChainIndicator(
-    thinkingChain: List<ThinkingChainManager.ThinkingStep>,
-    isActive: Boolean
-) {
-    val colors = LocalAppColors.current
-    val infiniteTransition = rememberInfiniteTransition(label = "thinking")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(800, easing = EaseInOutSine), repeatMode = RepeatMode.Reverse),
-        label = "pulse"
-    )
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp))
-                .background(colors.surface)
-                .padding(14.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).alpha(if (isActive) pulseAlpha else 0f).background(colors.accent))
-                    Spacer(Modifier.width(8.dp))
-                    Text("思考中", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.textSecondary)
-                }
-                if (thinkingChain.isNotEmpty()) {
-                    thinkingChain.takeLast(3).forEach { step ->
-                        val icon = when (step.type) {
-                            ThinkingChainManager.StepType.UNDERSTANDING -> "\uD83E\uDDE0"
-                            ThinkingChainManager.StepType.PLANNING -> "\uD83D\uDCCB"
-                            ThinkingChainManager.StepType.RETRIEVING -> "\uD83D\uDD0D"
-                            ThinkingChainManager.StepType.REASONING -> "\uD83D\uDCAD"
-                            ThinkingChainManager.StepType.DECIDING -> "⚖️"
-                            ThinkingChainManager.StepType.EXECUTING -> "⚡"
-                            ThinkingChainManager.StepType.VERIFYING -> "✅"
-                            ThinkingChainManager.StepType.RESPONDING -> "\uD83D\uDCAC"
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(icon, fontSize = 11.sp)
-                            Spacer(Modifier.width(6.dp))
-                            Text(step.content.take(50), fontSize = 12.sp, color = colors.textTertiary, maxLines = 1)
-                        }
-                    }
-                } else {
-                    Text("正在分析你的问题...", fontSize = 12.sp, color = colors.textTertiary)
-                }
+                Text(
+                    statusMessage ?: "思考中...",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
             }
         }
     }
@@ -818,200 +373,229 @@ private fun ImagePreview(imageUri: String, onRemove: () -> Unit) {
     }
 }
 
-// ============ 消息气泡 ============
+// ============ 聊天输入栏 ============
 @Composable
-private fun TextMessageBubble(
-    msg: ChatMessage,
-    animatedMessageIds: Set<Long>,
-    viewModel: AssistantViewModel
+private fun ChatInputBar(
+    inputText: String,
+    isLoading: Boolean,
+    pendingImageUri: String?,
+    isCozeConfigured: Boolean,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onPickImage: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    val alreadyAnimated = animatedMessageIds.contains(msg.id)
+    val canSend = (inputText.isNotBlank() || pendingImageUri != null) && !isLoading && isCozeConfigured
 
-    val segments = remember(msg.id, msg.text) {
-        if (msg.isUser || msg.isSystem) listOf(MessageSegment.TextSegment(msg.text))
-        else parseMessageSegments(msg.text)
-    }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
 
-    val fullTextLength = segments.filterIsInstance<MessageSegment.TextSegment>().sumOf { it.text.length }
-    var visibleTextLength by remember(msg.id) {
-        mutableIntStateOf(if (alreadyAnimated) fullTextLength else 0)
-    }
-
-    LaunchedEffect(msg.id) {
-        if (!msg.isUser && !msg.isSystem && !alreadyAnimated) {
-            visibleTextLength = 0
-            val charDelay = when { fullTextLength > 500 -> 5L; fullTextLength > 200 -> 10L; else -> 15L }
-            for (i in 1..fullTextLength) { delay(charDelay); visibleTextLength = i }
-            viewModel.markMessageAnimated(msg.id)
-        } else { visibleTextLength = fullTextLength }
-    }
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start) {
-        Column(horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start) {
-        val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
-        Box(
-            modifier = Modifier
-                .widthIn(max = maxWidth)
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (msg.isUser) 16.dp else 4.dp, bottomEnd = if (msg.isUser) 4.dp else 16.dp))
-                .background(if (msg.isUser) colors.messageUserBg else colors.messageAiBg)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 深度思考内容（如果有）
-                if (!msg.reasoningContent.isNullOrBlank() && !msg.isUser) {
-                    ReasoningCard(reasoning = msg.reasoningContent!!)
-                }
-
-                if (msg.imageUri != null) {
-                    AsyncImage(
-                        model = Uri.parse(msg.imageUri), contentDescription = "用户图片", contentScale = ContentScale.Fit,
-                        modifier = Modifier.sizeIn(maxWidth = 200.dp, maxHeight = 200.dp).clip(RoundedCornerShape(8.dp))
-                    )
-                }
-
-                // 检测是否为错误消息
-                val isErrorMsg = msg.text.contains("❌") || msg.text.contains("引擎异常") || msg.text.contains("引擎错误") || msg.text.contains("调用失败")
-                val errorColor = Color(0xFFFF4444)
-
-                SelectionContainer {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        var renderedTextLen = 0
-                        segments.forEach { segment ->
-                            when (segment) {
-                                is MessageSegment.TextSegment -> {
-                                    val remaining = (visibleTextLength - renderedTextLen).coerceIn(0, segment.text.length)
-                                    if (remaining > 0) {
-                                        val textColor = if (isErrorMsg) errorColor
-                                            else if (msg.isUser) colors.messageUserText
-                                            else colors.messageAiText
-                                        Text(text = segment.text.take(remaining), fontSize = 15.sp, color = textColor, lineHeight = 22.sp)
-                                    }
-                                    renderedTextLen += segment.text.length
-                                }
-                                is MessageSegment.CodeSegment -> {
-                                    if (visibleTextLength >= fullTextLength || msg.isUser || msg.isSystem) {
-                                        CodeBlockCard(language = segment.language, code = segment.code, fileName = segment.fileName)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // 内容区域结束
-            }
-        }
-        
-        // AI消息的复制按钮 —— 放在气泡外部左下角
-        if (!msg.isUser && !msg.isSystem && visibleTextLength >= fullTextLength) {
-            val context = LocalContext.current
-            var copied by remember { mutableStateOf(false) }
-            Row(
+            Column(
                 modifier = Modifier
-                    .padding(start = 4.dp, top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("message", msg.text)
-                            clipboard.setPrimaryClip(clip)
-                            copied = true
-                            android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                        .padding(4.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(0.5.dp, colors.border, RoundedCornerShape(20.dp))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "复制",
-                            tint = if (copied) colors.accent else colors.textTertiary,
-                            modifier = Modifier.size(14.dp)
+                    Column {
+                        // 文本输入区域
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp, max = 140.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = inputText,
+                                onValueChange = onInputChange,
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 15.sp,
+                                    color = colors.textPrimary,
+                                    lineHeight = 22.sp
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
+                                decorationBox = { innerTextField ->
+                                    Box {
+                                        if (inputText.isEmpty() && pendingImageUri == null) {
+                                            androidx.compose.foundation.text.BasicText(
+                                                text = if (!isCozeConfigured) "请先在设置中配置 PAT 和 Bot ID" else "说点什么...",
+                                                style = androidx.compose.ui.text.TextStyle(
+                                                    fontSize = 15.sp,
+                                                    color = colors.textTertiary,
+                                                    lineHeight = 22.sp
+                                                )
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                                .height(0.5.dp)
+                                .background(colors.border.copy(alpha = 0.4f))
                         )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            if (copied) "已复制" else "复制",
-                            fontSize = 11.sp,
-                            color = if (copied) colors.accent else colors.textTertiary
-                        )
+
+                        // 底部工具栏
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 左侧：附件按钮
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
+                                    .clickable { onPickImage() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("📎", fontSize = 14.sp)
+                            }
+
+                            // 右侧：发送按钮
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(if (canSend) colors.accent else colors.border.copy(alpha = 0.3f))
+                                    .clickable(enabled = canSend) { onSend() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = "发送",
+                                    tint = if (canSend) Color.White else colors.textTertiary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-        } // 关闭 Column
     }
 }
 
-// ============ 系统消息 ============
+// ============ 消息气泡 ============
 @Composable
-private fun SystemMessageBubble(text: String) {
+private fun TextMessageBubble(msg: ChatMessage) {
     val colors = LocalAppColors.current
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 13.sp, color = colors.textTertiary)
+
+    val segments = remember(msg.id, msg.text) {
+        if (msg.isUser) listOf(MessageSegment.TextSegment(msg.text))
+        else parseMessageSegments(msg.text)
     }
-}
 
-// ============ 编译进度气泡 ============
-@Composable
-private fun TaskProgressBubble(msg: ChatMessage) {
-    val colors = LocalAppColors.current
-    val progress = msg.taskProgress ?: return
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
+    ) {
         Column(
-            modifier = Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(16.dp)).background(colors.surface).padding(16.dp)
+            horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val icon = when (progress.status) { "completed" -> "✅"; "failed" -> "❌"; else -> "🔄" }
-                Text(icon, fontSize = 16.sp)
-                Spacer(Modifier.width(8.dp))
-                val titleColor = when (progress.status) {
-                    "completed" -> colors.success
-                    "failed" -> Color(0xFFFF4444)
-                    else -> colors.textPrimary
-                }
-                Text(
-                    when (progress.status) { "completed" -> "编译完成"; "failed" -> "编译失败"; else -> "编译进度" },
-                    fontSize = 15.sp, fontWeight = FontWeight.Medium, color = titleColor
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(msg.text, fontSize = 13.sp, color = colors.textSecondary, lineHeight = 20.sp)
-            Spacer(Modifier.height(12.dp))
-            LinearProgressIndicator(
-                progress = { progress.progress },
-                color = when (progress.status) { "completed" -> colors.success; "failed" -> colors.error; else -> colors.accent },
-                trackColor = colors.border,
-                modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp))
-            )
-            Spacer(Modifier.height(8.dp))
-            val msgColor = when (progress.status) {
-                "failed" -> Color(0xFFFF4444)
-                "completed" -> colors.success
-                else -> colors.textTertiary
-            }
-            Text(progress.message, fontSize = 12.sp, color = msgColor)
+            val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
+            Box(
+                modifier = Modifier
+                    .widthIn(max = maxWidth)
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 16.dp,
+                            bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                            bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                        )
+                    )
+                    .background(if (msg.isUser) colors.messageUserBg else colors.messageAiBg)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (msg.imageUri != null) {
+                        AsyncImage(
+                            model = Uri.parse(msg.imageUri),
+                            contentDescription = "用户图片",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.sizeIn(maxWidth = 200.dp, maxHeight = 200.dp).clip(RoundedCornerShape(8.dp))
+                        )
+                    }
 
-            if (progress.status == "completed" && progress.downloadUrl != null) {
-                Spacer(Modifier.height(12.dp))
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(colors.accent).clickable {
-                        try {
-                            val apkUri = Uri.parse(progress.downloadUrl)
-                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    SelectionContainer {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            segments.forEach { segment ->
+                                when (segment) {
+                                    is MessageSegment.TextSegment -> {
+                                        val textColor = if (msg.isUser) colors.messageUserText else colors.messageAiText
+                                        Text(
+                                            text = segment.text,
+                                            fontSize = 15.sp,
+                                            color = textColor,
+                                            lineHeight = 22.sp
+                                        )
+                                    }
+                                    is MessageSegment.CodeSegment -> {
+                                        CodeBlockCard(
+                                            language = segment.language,
+                                            code = segment.code,
+                                            fileName = segment.fileName
+                                        )
+                                    }
+                                }
                             }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                    }.padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
+                        }
+                    }
+                }
+            }
+
+            // AI 消息的复制按钮
+            if (!msg.isUser) {
+                val context = LocalContext.current
+                var copied by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("📱 安装 APK", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("message", msg.text)
+                                clipboard.setPrimaryClip(clip)
+                                copied = true
+                                android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "复制",
+                                tint = if (copied) colors.accent else colors.textTertiary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                if (copied) "已复制" else "复制",
+                                fontSize = 11.sp,
+                                color = if (copied) colors.accent else colors.textTertiary
+                            )
+                        }
+                    }
                 }
             }
         }
