@@ -314,7 +314,7 @@ private fun BuildStepTimeline(
 }
 
 @Composable
-private fun BuildStepRow(step: BuildStep, colors: androidx.compose.material3.ColorScheme) {
+private fun BuildStepRow(step: BuildStep, colors: com.meitu.generator.ui.theme.AppColors) {
     val (icon, iconColor, bgColor) = when (step.status) {
         StepStatus.SUCCESS -> Triple(Icons.Default.Check, Color.White, colors.success)
         StepStatus.FAILED -> Triple(Icons.Default.Close, Color.White, colors.error)
