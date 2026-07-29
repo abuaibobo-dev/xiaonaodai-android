@@ -127,4 +127,27 @@ interface GitHubService {
         @Path("repo") repo: String,
         @Path("artifact_id") artifactId: Long
     ): ResponseBody
+
+    // ============ Releases API ============
+
+    /**
+     * 获取指定 tag 的 Release
+     * GET /repos/{owner}/{repo}/releases/tags/{tag}
+     */
+    @GET("repos/{owner}/{repo}/releases/tags/{tag}")
+    suspend fun getReleaseByTag(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("tag") tag: String
+    ): GitHubRelease
+
+    /**
+     * 获取最新的 Release
+     * GET /repos/{owner}/{repo}/releases/latest
+     */
+    @GET("repos/{owner}/{repo}/releases/latest")
+    suspend fun getLatestRelease(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String
+    ): GitHubRelease
 }
