@@ -137,9 +137,12 @@ class AssistantViewModel @Inject constructor(
 
     private fun checkCozeConfig() {
         viewModelScope.launch {
-            val pat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
-            val botId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
-            _isCozeConfigured.value = pat.isNotBlank() && botId.isNotBlank()
+            val savedPat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
+            val savedBotId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
+            // 使用默认值回退：用户未配置时自动使用内置的 PAT 和 Bot ID
+            val effectivePat = savedPat.ifBlank { Constants.DEFAULT_COZE_PAT }
+            val effectiveBotId = savedBotId.ifBlank { Constants.DEFAULT_COZE_BOT_ID }
+            _isCozeConfigured.value = effectivePat.isNotBlank() && effectiveBotId.isNotBlank()
         }
     }
 
@@ -218,8 +221,10 @@ class AssistantViewModel @Inject constructor(
 
         try {
             // 更新 CozeApiClient 的配置（可能用户在设置中更改了）
-            val pat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
-            val botId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
+            val savedPat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
+            val savedBotId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
+            val pat = savedPat.ifBlank { Constants.DEFAULT_COZE_PAT }
+            val botId = savedBotId.ifBlank { Constants.DEFAULT_COZE_BOT_ID }
 
             val client = CozeApiClient(
                 baseUrl = Constants.COZE_API_BASE_URL,

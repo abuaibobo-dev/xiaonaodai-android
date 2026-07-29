@@ -6,6 +6,10 @@ object Constants {
     const val KEY_COZE_PAT = "coze_pat"
     const val KEY_COZE_BOT_ID = "coze_bot_id"
 
+    // 默认配置（开箱即用）
+    const val DEFAULT_COZE_PAT = "pat_UpyDNzHznqt05EuVxLR6HovSWc31SqOxRINUKSmrxMm31R91OCczSIxnFdPFacTD"
+    const val DEFAULT_COZE_BOT_ID = "7667987502787461163"
+
     // 本地数据库名
     const val DB_NAME = "meitu_database"
 

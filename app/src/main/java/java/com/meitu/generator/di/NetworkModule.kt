@@ -61,11 +61,13 @@ object NetworkModule {
         httpClient: OkHttpClient
     ): CozeApiClient {
         val pat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
+        val effectivePat = if (pat.isNotBlank()) pat else Constants.DEFAULT_COZE_PAT
         val botId = runBlocking { settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "") }
+        val effectiveBotId = if (botId.isNotBlank()) botId else Constants.DEFAULT_COZE_BOT_ID
         return CozeApiClient(
             baseUrl = Constants.COZE_API_BASE_URL,
-            pat = pat,
-            botId = botId,
+            pat = effectivePat,
+            botId = effectiveBotId,
             httpClient = httpClient
         )
     }
