@@ -848,6 +848,7 @@ private fun TextMessageBubble(
     }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start) {
+        Column(horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start) {
         val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
         Box(
             modifier = Modifier
@@ -940,6 +941,7 @@ private fun TextMessageBubble(
                 }
             }
         }
+        } // 关闭 Column
     }
 }
 

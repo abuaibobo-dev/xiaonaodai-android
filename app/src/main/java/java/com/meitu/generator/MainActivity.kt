@@ -20,6 +20,8 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -433,32 +435,74 @@ private fun SidebarDrawer(
             Spacer(Modifier.height(16.dp))
 
             // ============ 历史对话区 ============
-            Text(
-                "历史对话",
-                fontSize = 13.sp,
-                color = colors.textTertiary,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // 空状态
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Text(
+                    "历史对话",
+                    fontSize = 13.sp,
+                    color = colors.textTertiary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            val sessionList by viewModel.sessionList.collectAsState()
+            
+            if (sessionList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("\uD83D\uDCAC", fontSize = 24.sp)
                     Text(
                         "暂无历史对话",
                         fontSize = 13.sp,
                         color = colors.textTertiary
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(sessionList, key = { it.sessionId }) { session ->
+                        val title = session.firstUserMessage?.take(30) ?: "对话"
+                        val dateText = remember(session.firstTimestamp) {
+                            val sdf = java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.getDefault())
+                            sdf.format(java.util.Date(session.firstTimestamp))
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.surface.copy(alpha = 0.6f))
+                                .clickable {
+                                    viewModel.switchToSession(session.sessionId)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    title,
+                                    fontSize = 13.sp,
+                                    color = colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    dateText,
+                                    fontSize = 11.sp,
+                                    color = colors.textTertiary,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

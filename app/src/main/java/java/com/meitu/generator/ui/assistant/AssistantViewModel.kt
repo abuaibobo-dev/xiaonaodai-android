@@ -18,6 +18,7 @@ import com.meitu.generator.data.remote.dto.OpenAIRequest
 import com.meitu.generator.data.tools.BuildProgress
 import com.meitu.generator.data.tools.BuildProgressCallback
 import com.meitu.generator.data.local.dao.ChatMessageDao
+import com.meitu.generator.data.local.dao.SessionSummary
 import com.meitu.generator.data.local.entity.ChatMessageEntity
 import com.meitu.generator.repository.SettingsRepository
 import com.meitu.generator.util.Constants
@@ -92,6 +93,39 @@ class AssistantViewModel @Inject constructor(
         if (_conversationName.value == "新对话" && firstMessage.isNotBlank()) {
             val name = if (firstMessage.length > 15) firstMessage.take(15) + "..." else firstMessage
             _conversationName.value = name
+        }
+    }
+
+    // ============ 历史对话列表 ============
+    private val _sessionList = MutableStateFlow<List<SessionSummary>>(emptyList())
+    val sessionList: StateFlow<List<SessionSummary>> = _sessionList.asStateFlow()
+
+    fun loadSessionList() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val sessions = chatMessageDao.getSessionSummaries()
+                _sessionList.value = sessions
+            }
+        }
+    }
+
+    fun switchToSession(sessionId: Long) {
+        currentSessionId = sessionId
+        viewModelScope.launch {
+            loadMessagesFromDb()
+            // 恢复对话名称
+            val messages = _messages.value
+            val firstUserMsg = messages.firstOrNull { it.isUser }
+            _conversationName.value = if (firstUserMsg != null) {
+                if (firstUserMsg.text.length > 15) firstUserMsg.text.take(15) + "..." else firstUserMsg.text
+            } else {
+                "历史对话"
+            }
+            // 恢复 conversationHistory
+            conversationHistory.clear()
+            messages.takeLast(10).forEach { msg ->
+                conversationHistory.add(OpenAIMessage(role = if (msg.isUser) "user" else "assistant", content = msg.text))
+            }
         }
     }
 
@@ -207,6 +241,7 @@ class AssistantViewModel @Inject constructor(
             val savedModel = settingsRepo.getString(Constants.KEY_AI_MODEL, Constants.OPENAI_MODEL)
             _currentModel.value = savedModel
             loadMessagesFromDb()
+            loadSessionList()
         }
     }
 
@@ -322,6 +357,7 @@ class AssistantViewModel @Inject constructor(
                     timestamp = userMsg.timestamp,
                     sessionId = currentSessionId
                 ))
+                loadSessionList()
             } catch (_: Exception) {}
         }
 
@@ -562,5 +598,7 @@ class AssistantViewModel @Inject constructor(
         ))
         _conversationName.value = "新对话"
         conversationHistory.clear()
+        // 刷新历史对话列表
+        loadSessionList()
     }
 }
