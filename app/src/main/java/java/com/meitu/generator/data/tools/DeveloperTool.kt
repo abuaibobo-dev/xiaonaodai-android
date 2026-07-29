@@ -384,7 +384,11 @@ class DeveloperTool @Inject constructor(
             // Canvas / 绘制
             Triple("Canvas", "androidx.compose.foundation.Canvas") { it.contains("Canvas(") },
             Triple("Offset", "androidx.compose.ui.geometry.Offset") { it.contains("Offset(") || it.contains("Offset.Zero") },
-            Triple("Size", "androidx.compose.ui.geometry.Size") { it.contains("Size(") && !it.contains("DpSize") },
+            Triple("Size", "androidx.compose.ui.geometry.Size") {
+                val hasSizeUsage = it.contains("Size(") || it.contains(": Size") || it.contains("= Size") || it.contains(", Size")
+                val isDpSize = it.contains("DpSize")
+                hasSizeUsage && !isDpSize
+            },
             Triple("Stroke", "androidx.compose.ui.graphics.drawscope.Stroke") { 
                 it.contains("Stroke(") || (it.contains("style = Stroke") || it.contains("style=Stroke"))
             },
@@ -517,6 +521,7 @@ class DeveloperTool @Inject constructor(
             "import androidx.compose.ui.text.font.FontStyle",
             "import androidx.compose.ui.text.style.TextAlign",
             "import androidx.compose.ui.text.style.TextOverflow",
+            "import androidx.compose.ui.geometry.*",
             "import androidx.compose.ui.unit.dp",
             "import androidx.compose.ui.unit.sp",
             "import kotlinx.coroutines.delay"
