@@ -4,7 +4,6 @@ import android.content.SharedPreferences
 import javax.inject.Named
 import com.meitu.generator.data.local.dao.SettingsDao
 import com.meitu.generator.data.local.entity.SettingEntity
-import com.meitu.generator.util.Constants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -58,7 +57,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    // Secure storage for API keys
     fun saveApiKey(key: String, value: String) {
         securePrefs.edit().putString(key, value).apply()
     }
@@ -69,16 +67,5 @@ class SettingsRepository @Inject constructor(
 
     suspend fun deleteSetting(key: String) {
         settingsDao.delete(key)
-    }
-
-    suspend fun initDefaults() {
-        val defaults = mapOf(
-            Constants.KEY_AI_MODEL to Constants.OPENAI_MODEL
-        )
-        defaults.forEach { (key, value) ->
-            if (settingsDao.getSetting(key) == null) {
-                settingsDao.upsert(SettingEntity(key, value))
-            }
-        }
     }
 }
