@@ -55,8 +55,22 @@ class SettingsViewModel @Inject constructor(
     private val _zhipuApiKey = MutableStateFlow("")
     val zhipuApiKey: StateFlow<String> = _zhipuApiKey.asStateFlow()
 
+    // ============ GitHub 仓库配置 ============
+    private val _githubRepoOwner = MutableStateFlow("")
+    val githubRepoOwner: StateFlow<String> = _githubRepoOwner.asStateFlow()
+
+    private val _githubRepoName = MutableStateFlow("")
+    val githubRepoName: StateFlow<String> = _githubRepoName.asStateFlow()
+
+    private val _githubWorkflowId = MutableStateFlow("")
+    val githubWorkflowId: StateFlow<String> = _githubWorkflowId.asStateFlow()
+
+    private val _githubUserWorkflowId = MutableStateFlow("")
+    val githubUserWorkflowId: StateFlow<String> = _githubUserWorkflowId.asStateFlow()
+
     init {
         refreshApiKeys()
+        refreshGithubConfig()
     }
 
     private fun refreshApiKeys() {
@@ -83,6 +97,48 @@ class SettingsViewModel @Inject constructor(
 
     fun saveGithubToken(token: String) {
         securePrefs.edit().putString(Constants.KEY_GITHUB_TOKEN, token).apply()
+    }
+
+    // ============ GitHub 仓库配置 ============
+    private fun refreshGithubConfig() {
+        viewModelScope.launch {
+            _githubRepoOwner.value = settingsRepo.getString(Constants.KEY_GITHUB_REPO_OWNER, "")
+            _githubRepoName.value = settingsRepo.getString(Constants.KEY_GITHUB_REPO_NAME, "")
+            _githubWorkflowId.value = settingsRepo.getString(Constants.KEY_GITHUB_WORKFLOW_ID, "")
+            _githubUserWorkflowId.value = settingsRepo.getString(Constants.KEY_GITHUB_USER_WORKFLOW_ID, "")
+        }
+    }
+
+    fun saveGithubRepoOwner(owner: String) {
+        viewModelScope.launch {
+            settingsRepo.setString(Constants.KEY_GITHUB_REPO_OWNER, owner)
+            _githubRepoOwner.value = owner
+            _toastMessage.value = if (owner.isNotBlank()) "✅ 仓库 owner 已保存" else "✅ 已恢复默认"
+        }
+    }
+
+    fun saveGithubRepoName(name: String) {
+        viewModelScope.launch {
+            settingsRepo.setString(Constants.KEY_GITHUB_REPO_NAME, name)
+            _githubRepoName.value = name
+            _toastMessage.value = if (name.isNotBlank()) "✅ 仓库名已保存" else "✅ 已恢复默认"
+        }
+    }
+
+    fun saveGithubWorkflowId(id: String) {
+        viewModelScope.launch {
+            settingsRepo.setString(Constants.KEY_GITHUB_WORKFLOW_ID, id)
+            _githubWorkflowId.value = id
+            _toastMessage.value = if (id.isNotBlank()) "✅ 主App workflow 已保存" else "✅ 已恢复默认"
+        }
+    }
+
+    fun saveGithubUserWorkflowId(id: String) {
+        viewModelScope.launch {
+            settingsRepo.setString(Constants.KEY_GITHUB_USER_WORKFLOW_ID, id)
+            _githubUserWorkflowId.value = id
+            _toastMessage.value = if (id.isNotBlank()) "✅ 用户项目 workflow 已保存" else "✅ 已恢复默认"
+        }
     }
 
     fun saveDeepSeekApiKey(key: String) {
