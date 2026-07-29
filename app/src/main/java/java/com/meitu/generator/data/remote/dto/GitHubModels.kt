@@ -117,3 +117,38 @@ data class GitHubError(
     @SerializedName("documentation_url")
     val documentationUrl: String? = null
 )
+
+// ============ Releases API ============
+
+/** GitHub Release */
+data class GitHubRelease(
+    val id: Long,
+    @SerializedName("tag_name")
+    val tagName: String,
+    val name: String?,
+    val body: String?,
+    @SerializedName("created_at")
+    val createdAt: String,
+    @SerializedName("published_at")
+    val publishedAt: String?,
+    val prerelease: Boolean = false,
+    val assets: List<ReleaseAsset> = emptyList()
+)
+
+/** Release 资产 */
+data class ReleaseAsset(
+    val id: Long,
+    val name: String,
+    @SerializedName("content_type")
+    val contentType: String?,
+    val size: Long,
+    @SerializedName("download_count")
+    val downloadCount: Int = 0,
+    @SerializedName("browser_download_url")
+    val browserDownloadUrl: String,
+    val url: String,
+    @SerializedName("created_at")
+    val createdAt: String?,
+    @SerializedName("updated_at")
+    val updatedAt: String?
+)
