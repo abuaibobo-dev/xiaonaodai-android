@@ -52,6 +52,20 @@ fun SettingsScreen(
     var showSiliconFlowKeyDialog by remember { mutableStateOf(false) }
     var showMoonshotKeyDialog by remember { mutableStateOf(false) }
     var showZhipuKeyDialog by remember { mutableStateOf(false) }
+    val githubRepoOwner by viewModel.githubRepoOwner.collectAsState()
+    val githubRepoName by viewModel.githubRepoName.collectAsState()
+    val githubWorkflowId by viewModel.githubWorkflowId.collectAsState()
+    val githubUserWorkflowId by viewModel.githubUserWorkflowId.collectAsState()
+
+    var showRepoOwnerDialog by remember { mutableStateOf(false) }
+    var showRepoNameDialog by remember { mutableStateOf(false) }
+    var showWorkflowIdDialog by remember { mutableStateOf(false) }
+    var showUserWorkflowIdDialog by remember { mutableStateOf(false) }
+    var repoOwnerInput by remember { mutableStateOf("") }
+    var repoNameInput by remember { mutableStateOf("") }
+    var workflowIdInput by remember { mutableStateOf("") }
+    var userWorkflowIdInput by remember { mutableStateOf("") }
+
     var tokenInput by remember { mutableStateOf(githubToken) }
     var deepseekKeyInput by remember { mutableStateOf(deepseekApiKey) }
     var googleKeyInput by remember { mutableStateOf(googleApiKey) }
@@ -282,6 +296,41 @@ fun SettingsScreen(
                 }
             }
 
+            // ============ GitHub 仓库配置 ============
+            item { SectionTitle("GitHub 仓库配置") }
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.Card))
+                        .background(colors.surface)
+                ) {
+                    SettingRow(
+                        "仓库 Owner",
+                        githubRepoOwner.ifBlank { "默认: abuaibobo-dev" },
+                        onClick = { repoOwnerInput = githubRepoOwner; showRepoOwnerDialog = true }
+                    )
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp).height(0.5.dp).background(colors.border))
+                    SettingRow(
+                        "仓库名称",
+                        githubRepoName.ifBlank { "默认: xiaonaodai-android" },
+                        onClick = { repoNameInput = githubRepoName; showRepoNameDialog = true }
+                    )
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp).height(0.5.dp).background(colors.border))
+                    SettingRow(
+                        "主App Workflow",
+                        githubWorkflowId.ifBlank { "默认: build.yml" },
+                        onClick = { workflowIdInput = githubWorkflowId; showWorkflowIdDialog = true }
+                    )
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp).height(0.5.dp).background(colors.border))
+                    SettingRow(
+                        "用户项目 Workflow",
+                        githubUserWorkflowId.ifBlank { "默认: user-project-build.yml" },
+                        onClick = { userWorkflowIdInput = githubUserWorkflowId; showUserWorkflowIdDialog = true }
+                    )
+                }
+            }
+
             // ============ 数据管理 ============
             item { SectionTitle("数据管理") }
             item {
@@ -358,6 +407,114 @@ fun SettingsScreen(
             },
             confirmButton = { TextButton(onClick = { viewModel.saveGithubToken(tokenInput.trim()); showTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
             dismissButton = { TextButton(onClick = { showTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // GitHub Repo Owner dialog
+    if (showRepoOwnerDialog) {
+        AlertDialog(
+            onDismissRequest = { showRepoOwnerDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置仓库 Owner", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("GitHub 用户名或组织名，留空恢复默认", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = repoOwnerInput, onValueChange = { repoOwnerInput = it },
+                        label = { Text("如: abuaibobo-dev", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveGithubRepoOwner(repoOwnerInput.trim()); showRepoOwnerDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showRepoOwnerDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // GitHub Repo Name dialog
+    if (showRepoNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRepoNameDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置仓库名称", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("GitHub 仓库名，留空恢复默认", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = repoNameInput, onValueChange = { repoNameInput = it },
+                        label = { Text("如: xiaonaodai-android", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveGithubRepoName(repoNameInput.trim()); showRepoNameDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showRepoNameDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // GitHub Workflow ID dialog
+    if (showWorkflowIdDialog) {
+        AlertDialog(
+            onDismissRequest = { showWorkflowIdDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置主App Workflow", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("主App编译使用的 workflow 文件名，留空恢复默认", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = workflowIdInput, onValueChange = { workflowIdInput = it },
+                        label = { Text("如: build.yml", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveGithubWorkflowId(workflowIdInput.trim()); showWorkflowIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showWorkflowIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // GitHub User Workflow ID dialog
+    if (showUserWorkflowIdDialog) {
+        AlertDialog(
+            onDismissRequest = { showUserWorkflowIdDialog = false },
+            containerColor = colors.surface,
+            title = { Text("设置用户项目 Workflow", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("用户项目编译使用的 workflow 文件名，留空恢复默认", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = userWorkflowIdInput, onValueChange = { userWorkflowIdInput = it },
+                        label = { Text("如: user-project-build.yml", color = colors.textTertiary) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveGithubUserWorkflowId(userWorkflowIdInput.trim()); showUserWorkflowIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showUserWorkflowIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
     }
 
