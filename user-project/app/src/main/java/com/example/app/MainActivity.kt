@@ -1,10 +1,12 @@
 package com.example.app
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,17 +21,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.detectTapGestures
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.tween
+import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
 /**
  * 一个简单的打地鼠小游戏
- * 使用 Jetpack Compose 构建 UI，Hilt 进行依赖注入
+ * 使用 Jetpack Compose 构建 UI
  */
 
 class MainActivity : ComponentActivity() {
@@ -273,7 +281,7 @@ fun MoleCell(
                 // 地鼠
                 Canvas(
                     modifier = Modifier
-                        .fillMaxSize(scale)
+                        .fillMaxSize()
                         .padding(8.dp)
                 ) {
                     val canvasWidth = size.width
