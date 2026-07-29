@@ -165,7 +165,12 @@ class AgentEngine @Inject constructor(
     /**
      * 根据 platform 获取对应 Service，如果 Key 未配置则回退到 DeepSeek
      */
-    private fun getServiceForPlatform(platform: String): Pair<OpenAIService, String> {
+    /**
+     * 返回 Triple(service, authHeader, queryApiKey)
+     * - authHeader: Authorization 头的值，Google 时为空字符串
+     * - queryApiKey: URL ?key= 参数，仅 Google 非空
+     */
+    private fun getServiceForPlatform(platform: String): Triple<OpenAIService, String, String?> {
         val apiKey = getApiKeyForPlatform(platform)
         if (apiKey != null) {
             val service = when (platform) {
@@ -178,10 +183,13 @@ class AgentEngine @Inject constructor(
                 "zhipu" -> zhipuService
                 else -> deepseekService
             }
-            return Pair(service, "Bearer $apiKey")
+            // Google AI 的 OpenAI 兼容端点使用 ?key= 查询参数认证，不使用 Authorization header
+            val authHeader = if (platform == "google") "" else "Bearer $apiKey"
+            val queryKey = if (platform == "google") apiKey else null
+            return Triple(service, authHeader, queryKey)
         }
         // Key 未配置，回退到 DeepSeek
-        return Pair(deepseekService, "Bearer ${getDeepSeekApiKey()}")
+        return Triple(deepseekService, "Bearer ${getDeepSeekApiKey()}", null)
     }
 
 
@@ -326,8 +334,8 @@ class AgentEngine @Inject constructor(
 
                 // 根据模型名路由到正确的 service
                 val platform = getModelPlatform(model)
-                val (service, authHeader) = getServiceForPlatform(platform)
-                val response = service.chatCompletions(request, authHeader)
+                val (service, authHeader, queryKey) = getServiceForPlatform(platform)
+                val response = service.chatCompletions(request, authHeader, queryKey)
 
                 TokenEstimator.account(request.toString(), response.toString())
 
@@ -447,8 +455,8 @@ class AgentEngine @Inject constructor(
             )
             val model = Constants.OPENAI_MODEL
             val planPlatform = getModelPlatform(model)
-            val (planService, planAuth) = getServiceForPlatform(planPlatform)
-            val response = planService.chatCompletions(request, planAuth)
+            val (planService, planAuth, planQueryKey) = getServiceForPlatform(planPlatform)
+            val response = planService.chatCompletions(request, planAuth, planQueryKey)
             val text = response.choices?.firstOrNull()?.message?.content?.trim() ?: return null
 
             if (text == "null" || text.contains("\"null\"")) return null
