@@ -77,6 +77,9 @@ class AssistantViewModel @Inject constructor(
     )
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
+    // ============ 会话管理 ============
+    private var currentSessionId: Long = System.currentTimeMillis()
+
     // ============ 对话名称 ============
     private val _conversationName = MutableStateFlow("新对话")
     val conversationName: StateFlow<String> = _conversationName.asStateFlow()
@@ -208,11 +211,11 @@ class AssistantViewModel @Inject constructor(
     }
 
     /**
-     * 从数据库加载历史对话记录
+     * 从数据库加载历史对话记录（仅当前会话）
      */
     private suspend fun loadMessagesFromDb() {
         try {
-            val savedMessages = chatMessageDao.getRecentMessages(50)
+            val savedMessages = chatMessageDao.getRecentMessagesBySession(currentSessionId, 50)
             if (savedMessages.isNotEmpty()) {
                 val welcomeMsg = ChatMessage(
                     text = "你好！我是布老师，你的专属AI数字员工 🧠\n\n我能帮你：\n• 软件开发：写代码、改Bug、编译部署\n• 智能问答：聊天、翻译、深度分析\n• 联网搜索：实时信息、新闻、价格\n• 图片分析：识别内容、提取信息\n• 项目管理：创建、修改、迭代项目\n\n💡 有什么想法直接说，我来帮你实现",
@@ -316,7 +319,8 @@ class AssistantViewModel @Inject constructor(
                     text = userMsg.text,
                     isUser = true,
                     imageUri = userMsg.imageUri,
-                    timestamp = userMsg.timestamp
+                    timestamp = userMsg.timestamp,
+                    sessionId = currentSessionId
                 ))
             } catch (_: Exception) {}
         }
@@ -484,7 +488,8 @@ class AssistantViewModel @Inject constructor(
                             text = response,
                             isUser = false,
                             reasoningContent = reasoning,
-                            timestamp = System.currentTimeMillis()
+                            timestamp = System.currentTimeMillis(),
+                            sessionId = currentSessionId
                         ))
                     } catch (_: Exception) {}
                 }
@@ -534,6 +539,7 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
+    /** 清空对话：删除所有历史消息（不可恢复） */
     fun clearMessages() {
         _messages.value = listOf(ChatMessage(
             text = "对话已清空，有什么可以帮你的？",
@@ -545,5 +551,16 @@ class AssistantViewModel @Inject constructor(
                 chatMessageDao.deleteAll()
             } catch (_: Exception) {}
         }
+    }
+
+    /** 新建对话：保留历史数据，开启新会话 */
+    fun newConversation() {
+        currentSessionId = System.currentTimeMillis()
+        _messages.value = listOf(ChatMessage(
+            text = "你好！我是布老师，你的专属AI数字员工 🧠\n\n我能帮你：\n• 软件开发：写代码、改Bug、编译部署\n• 智能问答：聊天、翻译、深度分析\n• 联网搜索：实时信息、新闻、价格\n• 图片分析：识别内容、提取信息\n• 项目管理：创建、修改、迭代项目\n\n💡 有什么想法直接说，我来帮你实现",
+            isUser = false
+        ))
+        _conversationName.value = "新对话"
+        conversationHistory.clear()
     }
 }

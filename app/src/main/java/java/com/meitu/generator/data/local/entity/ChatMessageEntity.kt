@@ -11,5 +11,6 @@ data class ChatMessageEntity(
     val isSystem: Boolean = false,
     val imageUri: String? = null,
     val reasoningContent: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val sessionId: Long = 0
 )

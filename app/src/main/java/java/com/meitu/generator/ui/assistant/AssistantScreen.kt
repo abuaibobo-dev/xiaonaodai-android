@@ -210,7 +210,10 @@ fun AssistantScreen(
 
     LaunchedEffect(Unit) {
         AppEvents.events.collect { event ->
-            if (event == "clear_chat") viewModel.clearMessages()
+            when (event) {
+                "clear_chat" -> viewModel.clearMessages()
+                "new_chat" -> viewModel.newConversation()
+            }
         }
     }
 
@@ -348,6 +351,7 @@ fun AssistantScreen(
         val brainModel by viewModel.brainModel.collectAsState()
         val configuredBrainModels = viewModel.configuredBrainModels
         var showModelDropdown by remember { mutableStateOf(false) }
+        val eventScope = rememberCoroutineScope()
 
         Box(modifier = Modifier.imePadding()) {
             SmartInputBar(
@@ -368,7 +372,7 @@ fun AssistantScreen(
             onSelectModel = { model ->
                 if (model == "__config__") {
                     showModelDropdown = false
-                    AppEvents.emit("navigate_settings")
+                    eventScope.launch { AppEvents.send("navigate_settings") }
                 } else {
                     viewModel.switchBrainModel(model)
                     showModelDropdown = false

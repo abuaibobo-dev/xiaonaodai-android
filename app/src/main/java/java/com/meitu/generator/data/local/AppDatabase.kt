@@ -14,7 +14,7 @@ import com.meitu.generator.data.local.entity.*
         PlanEntity::class,
         ChatMessageEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -87,6 +87,17 @@ fun MainScreen() {
     // 用于顶栏余额显示（与 AssistantScreen 共享 ViewModel 实例）
     val assistantViewModel: AssistantViewModel = hiltViewModel()
 
+    // 监听导航事件（如模型下拉菜单中的"配置更多模型"入口）
+    LaunchedEffect(Unit) {
+        AppEvents.events.collect { event ->
+            if (event == "navigate_settings") {
+                navController.navigate(Routes.SETTINGS) {
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
         // ============ 主内容区域 ============
         Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
@@ -106,7 +117,7 @@ fun MainScreen() {
                             launchSingleTop = true
                             restoreState = true
                         }
-                        AppEvents.send("clear_chat")
+                        AppEvents.send("new_chat")
                     }
                 },
                 onClearChat = {
