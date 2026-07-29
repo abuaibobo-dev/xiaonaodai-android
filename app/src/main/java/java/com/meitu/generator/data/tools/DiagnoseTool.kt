@@ -155,7 +155,7 @@ class DiagnoseTool @Inject constructor(
                     messages = listOf(OpenAIMessage(role = "user", content = "hi")),
                     max_tokens = 5
                 )
-                val response = googleService.chatCompletions(request, "Bearer $apiKey")
+                val response = googleService.chatCompletions(request, "", apiKey)
                 if (response.error != null) {
                     "FAIL:${response.error.message ?: "未知错误"}"
                 } else {
