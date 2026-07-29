@@ -1,43 +1,49 @@
 package com.example.app
-
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyItemsHorizontal
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalContext
 
 
 /**
- * 一个简单的打地鼠小游戏
- * 使用 Jetpack Compose 构建 UI
+ * 贪吃蛇游戏主 Activity
+ * 使用 Jetpack Compose 构建 UI，Hilt 进行依赖注入
  */
 
 class MainActivity : ComponentActivity() {
@@ -45,7 +51,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                WhackAMoleGame()
+                SnakeGameScreen()
             }
         }
     }
@@ -55,292 +61,259 @@ class MainActivity : ComponentActivity() {
  * 游戏状态数据类
  */
 data class GameState(
-    val moles: List<Mole> = List(9) { Mole(id = it) },
-    val score: Int = 0,
-    val gameTime: Int = 30, // 游戏总时长（秒）
-    val isPlaying: Boolean = false
+    val snake: List<Offset> = listOf(Offset(5f, 5f)),
+    val food: Offset = Offset(10f, 10f),
+    val direction: Direction = Direction.RIGHT,
+    val isGameOver: Boolean = false,
+    val score: Int = 0
 )
 
 /**
- * 地鼠数据类
+ * 方向枚举
  */
-data class Mole(
-    val id: Int,
-    val isVisible: Boolean = false,
-    val position: Offset = Offset.Zero
-)
+enum class Direction {
+    UP, DOWN, LEFT, RIGHT
+}
 
 /**
- * 游戏主界面
+ * 游戏主屏幕 Composable
  */
 @Composable
-fun WhackAMoleGame() {
+fun SnakeGameScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // 游戏状态
     var gameState by remember { mutableStateOf(GameState()) }
-    var timeLeft by remember { mutableIntStateOf(30) }
-    var isGameRunning by remember { mutableStateOf(false) }
+    var isRunning by remember { mutableStateOf(false) }
 
-    // 游戏计时器
-    LaunchedEffect(isGameRunning) {
-        if (isGameRunning) {
-            timeLeft = 30
-            while (timeLeft > 0 && isGameRunning) {
-                kotlinx.coroutines.delay(1000)
-                timeLeft--
-            }
-            if (timeLeft == 0) {
-                isGameRunning = false
-            }
-        }
-    }
+    // 网格尺寸
+    val gridSize = 20
+    val cellSize = 16.dp
 
-    // 地鼠出现逻辑
-    LaunchedEffect(isGameRunning) {
-        if (isGameRunning) {
-            while (isGameRunning) {
-                kotlinx.coroutines.delay(Random.nextLong(500, 1500))
-                if (isGameRunning) {
-                    val randomIndex = Random.nextInt(9)
-                    gameState = gameState.copy(
-                        moles = gameState.moles.mapIndexed { index, mole ->
-                            if (index == randomIndex) mole.copy(isVisible = true)
-                            else mole
-                        }
-                    )
-                    // 地鼠出现一段时间后消失
-                    kotlinx.coroutines.delay(800)
-                    gameState = gameState.copy(
-                        moles = gameState.moles.mapIndexed { index, mole ->
-                            if (index == randomIndex) mole.copy(isVisible = false)
-                            else mole
-                        }
-                    )
-                }
+    // 游戏循环
+    LaunchedEffect(isRunning) {
+        if (isRunning) {
+            while (isRunning && !gameState.isGameOver) {
+                delay(200L) // 游戏速度
+                gameState = updateGameState(gameState, gridSize)
             }
         }
     }
 
-    // 动画值
-    val scoreAnim by animateFloatAsState(
-        targetValue = gameState.score.toFloat(),
-        animationSpec = tween(durationMillis = 300),
-        label = "score"
-    )
+    // 触摸事件处理
+    val onSwipe: (Direction) -> Unit = { newDirection ->
+        if (!isRunning) {
+            isRunning = true
+        }
+        // 防止反向移动
+        val currentDirection = gameState.direction
+        if (!isOppositeDirection(currentDirection, newDirection)) {
+            gameState = gameState.copy(direction = newDirection)
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF4CAF50))
+            .background(Color(0xFF1B1B2F))
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // 标题
+        // 分数显示
         Text(
-            text = "打地鼠",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
+            text = "分数: ${gameState.score}",
             color = Color.White,
+            fontSize = 24.sp,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // 分数和计时器
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Text(
-                text = "分数: ${scoreAnim.toInt()}",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = "时间: ${timeLeft}s",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (timeLeft <= 10) Color.Red else Color.White
-            )
-        }
+        // 游戏画布
+        Box(
+            modifier = Modifier
+                .size(gridSize * cellSize)
+                .background(Color(0xFF162447))
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        // 根据点击位置判断方向
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val dx = offset.x - centerX
+                        val dy = offset.y - centerY
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 游戏网格
-        GameGrid(
-            moles = gameState.moles,
-            onMoleClick = { moleId ->
-                if (isGameRunning) {
-                    val clickedMole = gameState.moles.find { it.id == moleId }
-                    if (clickedMole?.isVisible == true) {
-                        gameState = gameState.copy(
-                            score = gameState.score + 10,
-                            moles = gameState.moles.map {
-                                if (it.id == moleId) it.copy(isVisible = false)
-                                else it
+                        val newDirection = when {
+                            kotlin.math.abs(dx) > kotlin.math.abs(dy) -> {
+                                if (dx > 0) Direction.RIGHT else Direction.LEFT
                             }
-                        )
+                            else -> {
+                                if (dy > 0) Direction.DOWN else Direction.UP
+                            }
+                        }
+                        onSwipe(newDirection)
                     }
                 }
-            }
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 开始/重置按钮
-        Button(
-            onClick = {
-                if (isGameRunning) {
-                    // 重置游戏
-                    isGameRunning = false
-                    gameState = GameState()
-                    timeLeft = 30
-                } else {
-                    // 开始新游戏
-                    gameState = GameState(score = 0)
-                    isGameRunning = true
-                }
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isGameRunning) Color.Red else Color(0xFF2196F3)
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
         ) {
+            // 绘制游戏网格
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val cellWidth = size.width / gridSize
+                val cellHeight = size.height / gridSize
+
+                // 绘制网格线
+                for (i in 0..gridSize) {
+                    drawLine(
+                        color = Color(0xFF1F4068),
+                        start = Offset(i * cellWidth, 0f),
+                        end = Offset(i * cellWidth, size.height),
+                        strokeWidth = 1f
+                    )
+                    drawLine(
+                        color = Color(0xFF1F4068),
+                        start = Offset(0f, i * cellHeight),
+                        end = Offset(size.width, i * cellHeight),
+                        strokeWidth = 1f
+                    )
+                }
+
+                // 绘制蛇
+                gameState.snake.forEachIndexed { index, segment ->
+                    drawRect(
+                        color = if (index == 0) Color(0xFF00FF00) else Color(0xFF00CC00),
+                        topLeft = Offset(
+                            segment.x * cellWidth + 1f,
+                            segment.y * cellHeight + 1f
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            cellWidth - 2f,
+                            cellHeight - 2f
+                        )
+                    )
+                }
+
+                // 绘制食物
+                drawCircle(
+                    color = Color(0xFFFF4444),
+                    radius = cellWidth / 2f - 2f,
+                    center = Offset(
+                        gameState.food.x * cellWidth + cellWidth / 2f,
+                        gameState.food.y * cellHeight + cellHeight / 2f
+                    )
+                )
+            }
+        }
+
+        // 游戏结束提示
+        if (gameState.isGameOver) {
             Text(
-                text = if (isGameRunning) "重置游戏" else "开始游戏",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                text = "游戏结束!",
+                color = Color.Red,
+                fontSize = 32.sp,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Button(
+                onClick = {
+                    gameState = GameState()
+                    isRunning = false
+                },
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                Text("重新开始")
+            }
+        } else if (!isRunning) {
+            Text(
+                text = "点击屏幕开始游戏",
+                color = Color.White,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(top = 16.dp)
             )
         }
     }
 }
 
 /**
- * 游戏网格组件
+ * 更新游戏状态
  */
-@Composable
-fun GameGrid(
-    moles: List<Mole>,
-    onMoleClick: (Int) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+private fun updateGameState(currentState: GameState, gridSize: Int): GameState {
+    if (currentState.isGameOver) return currentState
+
+    val snake = currentState.snake.toMutableList()
+    val head = snake.first()
+    val direction = currentState.direction
+
+    // 计算新头部位置
+    val newHead = when (direction) {
+        Direction.UP -> Offset(head.x, head.y - 1f)
+        Direction.DOWN -> Offset(head.x, head.y + 1f)
+        Direction.LEFT -> Offset(head.x - 1f, head.y)
+        Direction.RIGHT -> Offset(head.x + 1f, head.y)
+    }
+
+    // 检查是否撞墙
+    if (newHead.x < 0 || newHead.x >= gridSize ||
+        newHead.y < 0 || newHead.y >= gridSize
     ) {
-        for (row in 0..2) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                for (col in 0..2) {
-                    val index = row * 3 + col
-                    val mole = moles.getOrNull(index) ?: return
-                    MoleCell(
-                        mole = mole,
-                        onClick = { onMoleClick(mole.id) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+        return currentState.copy(isGameOver = true)
+    }
+
+    // 检查是否撞到自己
+    if (snake.contains(newHead)) {
+        return currentState.copy(isGameOver = true)
+    }
+
+    // 添加新头部
+    snake.add(0, newHead)
+
+    // 检查是否吃到食物
+    var newFood = currentState.food
+    var newScore = currentState.score
+    if (newHead == currentState.food) {
+        newScore++
+        // 生成新食物
+        newFood = generateFood(snake, gridSize)
+    } else {
+        // 移除尾部
+        snake.removeAt(snake.size - 1)
+    }
+
+    return currentState.copy(
+        snake = snake,
+        food = newFood,
+        score = newScore
+    )
+}
+
+/**
+ * 生成新食物位置
+ */
+private fun generateFood(snake: List<Offset>, gridSize: Int): Offset {
+    val occupied = snake.toSet()
+    val available = mutableListOf<Offset>()
+
+    for (x in 0 until gridSize) {
+        for (y in 0 until gridSize) {
+            val pos = Offset(x.toFloat(), y.toFloat())
+            if (pos !in occupied) {
+                available.add(pos)
             }
         }
+    }
+
+    return if (available.isNotEmpty()) {
+        available.random()
+    } else {
+        // 所有格子都被占满，游戏胜利
+        Offset(-1f, -1f)
     }
 }
 
 /**
- * 单个地鼠格子组件
+ * 检查是否为相反方向
  */
-@Composable
-fun MoleCell(
-    mole: Mole,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // 地鼠出现动画
-    val scale by animateFloatAsState(
-        targetValue = if (mole.isVisible) 1f else 0.8f,
-        animationSpec = tween(durationMillis = 200),
-        label = "moleScale"
-    )
-
-    Card(
-        modifier = modifier
-            .aspectRatio(1f)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onClick() })
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF8B4513) // 棕色地洞
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            if (mole.isVisible) {
-                // 地鼠
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                ) {
-                    val canvasWidth = size.width
-                    val canvasHeight = size.height
-
-                    // 地鼠身体（圆形）
-                    drawCircle(
-                        color = Color(0xFF8B4513),
-                        radius = canvasWidth * 0.4f,
-                        center = Offset(canvasWidth / 2, canvasHeight * 0.6f)
-                    )
-
-                    // 地鼠头部
-                    drawCircle(
-                        color = Color(0xFFA0522D),
-                        radius = canvasWidth * 0.3f,
-                        center = Offset(canvasWidth / 2, canvasHeight * 0.35f)
-                    )
-
-                    // 眼睛
-                    drawCircle(
-                        color = Color.Black,
-                        radius = canvasWidth * 0.05f,
-                        center = Offset(canvasWidth * 0.4f, canvasHeight * 0.3f)
-                    )
-                    drawCircle(
-                        color = Color.Black,
-                        radius = canvasWidth * 0.05f,
-                        center = Offset(canvasWidth * 0.6f, canvasHeight * 0.3f)
-                    )
-
-                    // 鼻子
-                    drawCircle(
-                        color = Color(0xFFFF69B4),
-                        radius = canvasWidth * 0.04f,
-                        center = Offset(canvasWidth / 2, canvasHeight * 0.38f)
-                    )
-                }
-            } else {
-                // 空的地洞
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                ) {
-                    val canvasWidth = size.width
-                    val canvasHeight = size.height
-
-                    // 地洞椭圆
-                    drawOval(
-                        color = Color(0xFF3E2723),
-                        topLeft = Offset(canvasWidth * 0.1f, canvasHeight * 0.6f),
-                        size = androidx.compose.ui.geometry.Size(
-                            canvasWidth * 0.8f,
-                            canvasHeight * 0.3f
-                        )
-                    )
-                }
-            }
-        }
+private fun isOppositeDirection(current: Direction, new: Direction): Boolean {
+    return when (current) {
+        Direction.UP -> new == Direction.DOWN
+        Direction.DOWN -> new == Direction.UP
+        Direction.LEFT -> new == Direction.RIGHT
+        Direction.RIGHT -> new == Direction.LEFT
     }
 }
