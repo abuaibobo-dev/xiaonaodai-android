@@ -96,7 +96,7 @@ class DeveloperTool @Inject constructor(
                 model = effectiveModel,
                 messages = listOf(OpenAIMessage(role = "user", content = prompt)),
                 temperature = 0.3,
-                maxTokens = 4000
+                max_tokens = 4000
             )
 
             val apiKey = (securePrefs.getString(Constants.KEY_AI_API_KEY, "") ?: "").ifBlank { Constants.OPENAI_API_KEY }
