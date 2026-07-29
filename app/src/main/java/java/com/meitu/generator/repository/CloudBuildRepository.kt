@@ -63,10 +63,26 @@ data class DownloadProgress(
  */
 @Singleton
 class CloudBuildRepository @Inject constructor(
-    private val gitHubService: GitHubService
+    private val gitHubService: GitHubService,
+    private val settingsRepository: SettingsRepository
 ) {
-    private val owner = Constants.GITHUB_REPO_OWNER
-    private val repo = Constants.GITHUB_REPO_NAME
+    /** 从用户设置读取 GitHub 仓库 owner，未配置则用默认值 */
+    private suspend fun getOwner(): String {
+        val configured = settingsRepository.getString(Constants.KEY_GITHUB_REPO_OWNER, "")
+        return configured.ifBlank { Constants.GITHUB_REPO_OWNER }
+    }
+
+    /** 从用户设置读取 GitHub 仓库名，未配置则用默认值 */
+    private suspend fun getRepo(): String {
+        val configured = settingsRepository.getString(Constants.KEY_GITHUB_REPO_NAME, "")
+        return configured.ifBlank { Constants.GITHUB_REPO_NAME }
+    }
+
+    /** 从用户设置读取用户项目 workflow ID，未配置则用默认值 */
+    private suspend fun getUserProjectWorkflowId(): String {
+        val configured = settingsRepository.getString(Constants.KEY_GITHUB_USER_WORKFLOW_ID, "")
+        return configured.ifBlank { Constants.GITHUB_USER_PROJECT_WORKFLOW_ID }
+    }
 
     // ============ 文件推送 ============
 
@@ -85,7 +101,7 @@ class CloudBuildRepository @Inject constructor(
         )
 
         val existingSha = try {
-            gitHubService.getFileContent(owner, repo, path).sha
+            gitHubService.getFileContent(getOwner(), getRepo(), path).sha
         } catch (_: Exception) {
             null
         }
@@ -97,7 +113,7 @@ class CloudBuildRepository @Inject constructor(
             branch = "main"
         )
 
-        val response = gitHubService.createOrUpdateFile(owner, repo, path, request)
+        val response = gitHubService.createOrUpdateFile(getOwner(), getRepo(), path, request)
         response.content?.sha ?: throw IllegalStateException("推送文件失败: 无返回 SHA")
     }
 
@@ -149,10 +165,11 @@ class CloudBuildRepository @Inject constructor(
 
     suspend fun triggerBuild(
         token: String,
-        workflowId: String = Constants.GITHUB_WORKFLOW_ID
+        workflowId: String = ""
     ): Result<Unit> = runCatching {
+        val effectiveWorkflowId = workflowId.ifBlank { getUserProjectWorkflowId() }
         val request = WorkflowDispatchRequest(ref = "main")
-        val response = gitHubService.triggerWorkflow(owner, repo, workflowId, request)
+        val response = gitHubService.triggerWorkflow(getOwner(), getRepo(), effectiveWorkflowId, request)
         if (!response.isSuccessful) {
             throw IllegalStateException("触发编译失败: HTTP ${response.code()}")
         }
@@ -160,27 +177,25 @@ class CloudBuildRepository @Inject constructor(
 
     // ============ 编译状态 ============
 
-    private val userProjectWorkflowId = "user-project-build.yml"
-
     suspend fun getLatestRun(token: String): Result<WorkflowRun?> = runCatching {
         try {
-            val runs = gitHubService.getWorkflowRunsByWorkflowId(owner, repo, userProjectWorkflowId, perPage = 1)
+            val runs = gitHubService.getWorkflowRunsByWorkflowId(getOwner(), getRepo(), getUserProjectWorkflowId(), perPage = 1)
             val userRun = runs.workflowRuns.firstOrNull()
             if (userRun != null) return@runCatching userRun
         } catch (_: Exception) {}
-        val runs = gitHubService.getWorkflowRuns(owner, repo, perPage = 1)
+        val runs = gitHubService.getWorkflowRuns(getOwner(), getRepo(), perPage = 1)
         runs.workflowRuns.firstOrNull()
     }
 
     suspend fun getBuildStatus(token: String, runId: Long): Result<WorkflowRun> = runCatching {
-        gitHubService.getWorkflowRun(owner, repo, runId)
+        gitHubService.getWorkflowRun(getOwner(), getRepo(), runId)
     }
 
     /**
      * 获取编译任务的 jobs 和 steps 详情
      */
     suspend fun getBuildJobs(token: String, runId: Long): Result<WorkflowJobsResponse> = runCatching {
-        gitHubService.getWorkflowRunJobs(owner, repo, runId)
+        gitHubService.getWorkflowRunJobs(getOwner(), getRepo(), runId)
     }
 
     fun pollBuildStatus(
@@ -221,7 +236,7 @@ class CloudBuildRepository @Inject constructor(
                 val run = result.getOrThrow()
                 // 获取 jobs 详情
                 val jobs = try {
-                    gitHubService.getWorkflowRunJobs(owner, repo, runId).jobs
+                    gitHubService.getWorkflowRunJobs(getOwner(), getRepo(), runId).jobs
                 } catch (_: Exception) {
                     emptyList()
                 }
@@ -243,11 +258,11 @@ class CloudBuildRepository @Inject constructor(
     // ============ 产物下载 ============
 
     suspend fun getArtifacts(token: String, runId: Long): Result<ArtifactList> = runCatching {
-        gitHubService.getArtifacts(owner, repo, runId)
+        gitHubService.getArtifacts(getOwner(), getRepo(), runId)
     }
 
     suspend fun findApkArtifact(token: String, runId: Long): Result<Artifact?> = runCatching {
-        val artifacts = gitHubService.getArtifacts(owner, repo, runId)
+        val artifacts = gitHubService.getArtifacts(getOwner(), getRepo(), runId)
         // 优先匹配 user-project-apk，其次匹配任意非过期产物
         artifacts.artifacts.firstOrNull { it.name == "user-project-apk" && !it.expired }
             ?: artifacts.artifacts.firstOrNull { it.name.endsWith("-apk") && !it.expired }
@@ -287,7 +302,7 @@ class CloudBuildRepository @Inject constructor(
         onDownloadProgress: ((DownloadProgress) -> Unit)?
     ): Pair<String, Long>? {
         return try {
-            val release = gitHubService.getReleaseByTag(owner, repo, releaseTag)
+            val release = gitHubService.getReleaseByTag(getOwner(), getRepo(), releaseTag)
             val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
                 ?: return null
 
@@ -357,7 +372,7 @@ class CloudBuildRepository @Inject constructor(
             .followSslRedirects(true)
             .build()
 
-        val url = "https://api.github.com/repos/$owner/$repo/actions/artifacts/$artifactId/zip"
+        val url = "https://api.github.com/repos/${getOwner()}/${getRepo()}/actions/artifacts/$artifactId/zip"
         val request = okhttp3.Request.Builder()
             .url(url)
             .addHeader("Authorization", "Bearer $token")
@@ -432,7 +447,7 @@ class CloudBuildRepository @Inject constructor(
      */
     suspend fun getBuildErrorLog(token: String, runId: Long): String? {
         return try {
-            val artifacts = gitHubService.getArtifacts(owner, repo, runId)
+            val artifacts = gitHubService.getArtifacts(getOwner(), getRepo(), runId)
             val errorLog = artifacts.artifacts.firstOrNull { it.name == "user-build-error-log" || it.name == "build-error-log" }
             if (errorLog != null) {
                 val client = okhttp3.OkHttpClient.Builder()
