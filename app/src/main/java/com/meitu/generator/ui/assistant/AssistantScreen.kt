@@ -280,25 +280,6 @@ fun AssistantScreen(
         // ============ 输入区域 ============
         Box(modifier = Modifier.imePadding()) {
             Column {
-                // 通道指示器
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val channelLabel = if (currentChannel == "deepseek") "🔍 DeepSeek" else "🧠 Coze"
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(colors.surface.copy(alpha = 0.6f))
-                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                    ) {
-                        Text(channelLabel, fontSize = 10.sp, color = colors.textTertiary)
-                    }
-                }
-
                 ChatInputBar(
                     inputText = inputText,
                     isLoading = isLoading,
@@ -498,16 +479,31 @@ private fun ChatInputBar(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左侧：附件按钮
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
-                                    .clickable { onPickImage() },
-                                contentAlignment = Alignment.Center
+                            // 左侧：附件按钮 + 通道指示器
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text("📎", fontSize = 14.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
+                                        .clickable { onPickImage() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("📎", fontSize = 14.sp)
+                                }
+
+                                val channelLabel = if (currentChannel == "deepseek") "DeepSeek" else "🧠 Coze"
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(colors.surface.copy(alpha = 0.6f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(channelLabel, fontSize = 10.sp, color = colors.textTertiary)
+                                }
                             }
 
                             // 右侧：发送按钮
