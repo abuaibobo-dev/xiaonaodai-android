@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Coze API 客户端 - 使用 OkHttp 直接处理 SSE 流式响应
+ * 支持 Deepseek 思考模式：reasoning_content 用于思考展示，
+ * content 用于最终回答。completed 事件兜底确保消息不丢失。
  */
 class CozeApiClient(
     private val baseUrl: String,
@@ -38,7 +40,7 @@ class CozeApiClient(
 
     /**
      * 发送消息并流式接收回复
-     * @return Flow<String> 每次 emit 一段增量文本
+     * @return Flow<StreamEvent> 每次 emit 一段增量文本或状态
      */
     fun streamChat(
         message: String,
@@ -71,7 +73,7 @@ class CozeApiClient(
             .post(requestBody.toString().toRequestBody(JSON_MEDIA))
             .build()
 
-        Log.d(TAG, "Creating chat with bot: $botId")
+        Log.d(TAG, "Creating chat with bot: $botId, thinking mode supported")
 
         val response = withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute()
@@ -87,8 +89,10 @@ class CozeApiClient(
         // Step 2: 读取 SSE 流
         val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
         var fullText = StringBuilder()
+        var reasoningText = StringBuilder()
         var chatId = ""
         var convId = conversationId ?: ""
+        var hasEmittedDone = false
 
         try {
             var line: String?
@@ -107,25 +111,54 @@ class CozeApiClient(
                             chatId = json.getAsJsonObject("chat")?.get("id")?.asString ?: ""
                             convId = json.getAsJsonObject("chat")?.get("conversation_id")?.asString ?: convId
                             Log.d(TAG, "Chat created: $chatId, conversation: $convId")
-                        }
-                        "conversation.chat.in_progress" -> {
                             emit(StreamEvent.Status("思考中..."))
                         }
+                        "conversation.chat.in_progress" -> {
+                            // 持续显示思考中状态
+                        }
                         "conversation.message.delta" -> {
+                            // 优先读取 content（正式回答）
                             val content = json.get("content")?.asString ?: ""
+                            // 读取 reasoning_content（思考过程，Deepseek 思考模式）
+                            val reasoning = json.get("reasoning_content")?.asString ?: ""
+
                             if (content.isNotEmpty()) {
                                 fullText.append(content)
                                 emit(StreamEvent.Delta(content))
+                            } else if (reasoning.isNotEmpty()) {
+                                // 思考阶段也收集，但不单独 emit delta（避免显示内部推理）
+                                reasoningText.append(reasoning)
+                                // 如果还没有收到任何正式内容，保持"思考中..."
+                                if (fullText.isEmpty()) {
+                                    emit(StreamEvent.Status("深度思考中..."))
+                                }
                             }
                         }
                         "conversation.message.completed" -> {
-                            Log.d(TAG, "Message completed")
+                            val type = json.get("type")?.asString ?: ""
+                            val content = json.get("content")?.asString ?: ""
+                            Log.d(TAG, "Message completed: type=$type, contentLen=${content.length}")
+                            // 如果是 answer 类型且 content 有内容，但 delta 还没收到，兜底使用
+                            if (type == "answer" && content.isNotEmpty() && fullText.isEmpty()) {
+                                fullText.append(content)
+                                Log.d(TAG, "Recovered full text from completed event")
+                            }
                         }
                         "conversation.chat.completed" -> {
-                            emit(StreamEvent.Done(fullText.toString(), chatId, convId))
+                            Log.d(TAG, "Chat completed. fullText length: ${fullText.length}")
+                            if (!hasEmittedDone) {
+                                if (fullText.isNotEmpty()) {
+                                    emit(StreamEvent.Done(fullText.toString(), chatId, convId))
+                                } else {
+                                    emit(StreamEvent.Error("AI 回复为空，请重试"))
+                                }
+                                hasEmittedDone = true
+                            }
                         }
                         "conversation.chat.failed" -> {
-                            emit(StreamEvent.Error("AI 回复失败，请重试"))
+                            val errCode = json.getAsJsonObject("chat")?.getAsJsonObject("last_error")?.get("code")?.asInt ?: 0
+                            val errMsg = json.getAsJsonObject("chat")?.getAsJsonObject("last_error")?.get("msg")?.asString ?: ""
+                            emit(StreamEvent.Error("AI 回复失败 (code=$errCode): $errMsg"))
                         }
                         "done" -> {
                             // 流结束
@@ -140,9 +173,13 @@ class CozeApiClient(
             response.close()
         }
 
-        // 如果流结束了但没有收到 completed 事件
-        if (fullText.isNotEmpty()) {
-            emit(StreamEvent.Done(fullText.toString(), chatId, convId))
+        // 如果流结束了但没有收到 completed 事件，兜底
+        if (!hasEmittedDone) {
+            if (fullText.isNotEmpty()) {
+                emit(StreamEvent.Done(fullText.toString(), chatId, convId))
+            } else {
+                emit(StreamEvent.Error("AI 未返回内容，请重试"))
+            }
         }
     }.flowOn(Dispatchers.IO)
 
@@ -195,7 +232,7 @@ class CozeApiClient(
         val status = chatData.get("status")?.asString ?: ""
 
         // 轮询等待完成
-        var maxRetries = 60
+        var maxRetries = 120
         var currentStatus = status
         while (currentStatus != "completed" && currentStatus != "failed" && maxRetries > 0) {
             delay(1000)
