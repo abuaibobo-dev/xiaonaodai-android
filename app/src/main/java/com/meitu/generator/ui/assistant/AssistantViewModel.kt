@@ -127,7 +127,7 @@ class AssistantViewModel @Inject constructor(
     private var streamJob: Job? = null
 
     // ============ Coze 配置状态 ============
-    private val _isCozeConfigured = MutableStateFlow(false)
+    private val _isCozeConfigured = MutableStateFlow(true)
     val isCozeConfigured: StateFlow<Boolean> = _isCozeConfigured.asStateFlow()
 
     // ============ 当前 AI 通道 ============
