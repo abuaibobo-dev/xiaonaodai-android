@@ -156,6 +156,7 @@ fun AssistantScreen(
     val statusMessage by viewModel.statusMessage.collectAsState()
     val isCozeConfigured by viewModel.isCozeConfigured.collectAsState()
     val currentChannel by viewModel.currentChannel.collectAsState()
+    val replyToMessage by viewModel.replyToMessage.collectAsState()
     val listState = rememberLazyListState()
 
     // 判断当前通道是否可用
@@ -223,7 +224,7 @@ fun AssistantScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages, key = { it.id }) { msg ->
-                        TextMessageBubble(msg)
+                        TextMessageBubble(msg, onReply = { viewModel.setReplyToMessage(it) })
                     }
 
                     if (isLoading) {
@@ -275,6 +276,14 @@ fun AssistantScreen(
         // ============ 图片预览区 ============
         if (pendingImageUri != null) {
             ImagePreview(imageUri = pendingImageUri!!, onRemove = { viewModel.setPendingImageUri(null) })
+        }
+
+        // ============ 引用回复预览 ============
+        if (replyToMessage != null) {
+            ReplyPreview(
+                message = replyToMessage!!,
+                onDismiss = { viewModel.clearReplyToMessage() }
+            )
         }
 
         // ============ 输入区域 ============
@@ -373,6 +382,46 @@ private fun ImagePreview(imageUri: String, onRemove: () -> Unit) {
             ) {
                 Icon(Icons.Default.Close, contentDescription = "移除", tint = colors.textSecondary, modifier = Modifier.size(12.dp))
             }
+        }
+    }
+}
+
+// ============ 引用回复预览 ============
+@Composable
+private fun ReplyPreview(message: ChatMessage, onDismiss: () -> Unit) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(colors.accent)
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (message.isUser) "你" else "布老师",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.accent
+            )
+            Text(
+                message.text.take(60).replace("\n", " "),
+                fontSize = 12.sp,
+                color = colors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "取消引用", tint = colors.textTertiary, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -476,18 +525,24 @@ private fun ChatInputBar(
                                     modifier = Modifier
                                         .size(28.dp)
                                         .clip(CircleShape)
-                                        .background(if (pendingImageUri != null) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
+                                        .background(Color(0xFF8A8A8A).copy(alpha = 0.25f))
                                         .clickable { onPickImage() },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("📎", fontSize = 14.sp)
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "附件",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
 
-                                val channelLabel = if (currentChannel == "deepseek") "DeepSeek" else "🧠 Coze"
+                                val channelLabel = viewModel.getChannelLabel()
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(colors.surface.copy(alpha = 0.6f))
+                                        .clickable { viewModel.cycleChannel() }
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(channelLabel, fontSize = 10.sp, color = colors.textTertiary)
@@ -520,13 +575,21 @@ private fun ChatInputBar(
 
 // ============ 消息气泡 ============
 @Composable
-private fun TextMessageBubble(msg: ChatMessage) {
+private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit = {}) {
     val colors = LocalAppColors.current
 
     val segments = remember(msg.id, msg.text) {
         if (msg.isUser) listOf(MessageSegment.TextSegment(msg.text))
         else parseMessageSegments(msg.text)
     }
+
+    // 用户气泡→Coze蓝色，AI气泡→白色
+    val userBubbleBg = Color(0xFF1677FF)
+    val aiBubbleBg = Color(0xFFFFFFFF)
+    val userTextColor = Color.White
+    val aiTextColor = Color(0xFF1A1A1A)
+
+    var showMenu by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -535,6 +598,14 @@ private fun TextMessageBubble(msg: ChatMessage) {
         Column(
             horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start
         ) {
+            // 引用回复预览
+            if (msg.replyToId != null) {
+                val repliedMsg = remember(msg.replyToId) {
+                    // 通过context获取父Composable的messages可能不方便，从viewModel获取
+                }
+                // 实际引用内容在消息气泡内部渲染
+            }
+
             val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
             Box(
                 modifier = Modifier
@@ -547,7 +618,7 @@ private fun TextMessageBubble(msg: ChatMessage) {
                             bottomEnd = if (msg.isUser) 4.dp else 16.dp
                         )
                     )
-                    .background(if (msg.isUser) colors.messageUserBg else colors.messageAiBg)
+                    .background(if (msg.isUser) userBubbleBg else aiBubbleBg)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -565,7 +636,7 @@ private fun TextMessageBubble(msg: ChatMessage) {
                             segments.forEach { segment ->
                                 when (segment) {
                                     is MessageSegment.TextSegment -> {
-                                        val textColor = if (msg.isUser) colors.messageUserText else colors.messageAiText
+                                        val textColor = if (msg.isUser) userTextColor else aiTextColor
                                         Text(
                                             text = segment.text,
                                             fontSize = 15.sp,
@@ -587,40 +658,87 @@ private fun TextMessageBubble(msg: ChatMessage) {
                 }
             }
 
-            // AI 消息的复制按钮
-            if (!msg.isUser) {
-                val context = LocalContext.current
-                var copied by remember { mutableStateOf(false) }
-                Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("message", msg.text)
-                                clipboard.setPrimaryClip(clip)
-                                copied = true
-                                android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                            .padding(4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "复制",
-                                tint = if (copied) colors.accent else colors.textTertiary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                if (copied) "已复制" else "复制",
-                                fontSize = 11.sp,
-                                color = if (copied) colors.accent else colors.textTertiary
-                            )
+            // 消息操作栏：复制 / 引用回复 / 分享
+            val context = LocalContext.current
+            var copied by remember { mutableStateOf(false) }
+            // 通过 LocalContext 获取 Activity 以获取 ViewModel
+            val activity = context as? android.app.Activity
+            Row(
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
+            ) {
+                // 复制
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("message", msg.text)
+                            clipboard.setPrimaryClip(clip)
+                            copied = true
+                            android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
                         }
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "复制",
+                            tint = if (copied) colors.accent else colors.textTertiary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        Text(
+                            if (copied) "已复制" else "复制",
+                            fontSize = 10.sp,
+                            color = if (copied) colors.accent else colors.textTertiary
+                        )
+                    }
+                }
+
+                // 引用回复
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onReply(msg) }
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Reply,
+                            contentDescription = "引用回复",
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        Text("引用", fontSize = 10.sp, color = colors.textTertiary)
+                    }
+                }
+
+                // 分享
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            val sendIntent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TEXT, msg.text)
+                                type = "text/plain"
+                            }
+                            context.startActivity(android.content.Intent.createChooser(sendIntent, "分享到"))
+                        }
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "分享",
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        Text("分享", fontSize = 10.sp, color = colors.textTertiary)
                     }
                 }
             }
