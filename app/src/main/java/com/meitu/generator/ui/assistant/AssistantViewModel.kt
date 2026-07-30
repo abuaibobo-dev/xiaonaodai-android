@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.remote.CozeApiClient
 import com.meitu.generator.data.remote.StreamEvent
+import com.meitu.generator.data.remote.TokenUsage
 import com.meitu.generator.data.local.dao.ChatMessageDao
 import com.meitu.generator.data.local.dao.SessionSummary
 import com.meitu.generator.data.local.entity.ChatMessageEntity
@@ -232,22 +233,20 @@ class AssistantViewModel @Inject constructor(
 
     // ============ DeepSeek 直连 ============
     private suspend fun streamChatFromDeepSeek(message: String) {
-        val aiMessageId = System.nanoTime()
-        val aiMessage = ChatMessage(id = aiMessageId, text = "", isUser = false)
-        _messages.value = (_messages.value + aiMessage).takeLast(100)
-
+        var aiMessageId: Long? = null
         var fullResponse = StringBuilder()
 
         try {
             val apiKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
             val systemPrompt = securePrefs.getString("deepseek_system_prompt", "") ?: ""
+            val dsModel = securePrefs.getString(Constants.KEY_DEEPSEEK_MODEL, "deepseek-v4-flash") ?: "deepseek-v4-flash"
 
-            // 构建历史对话
             val history = buildHistoryFromMessages()
 
             cozeClient.streamDeepSeekChat(
                 apiKey = apiKey,
                 message = message,
+                model = dsModel,
                 systemPrompt = systemPrompt.ifBlank { null },
                 history = history
             ).collect { event ->
@@ -256,25 +255,38 @@ class AssistantViewModel @Inject constructor(
                         _statusMessage.value = event.message
                     }
                     is StreamEvent.Delta -> {
+                        if (aiMessageId == null) {
+                            aiMessageId = System.nanoTime()
+                            val newMsg = ChatMessage(id = aiMessageId!!, text = "", isUser = false)
+                            _messages.value = (_messages.value + newMsg).takeLast(100)
+                        }
                         fullResponse.append(event.text)
+                        val id = aiMessageId!!
                         _messages.value = _messages.value.map { msg ->
-                            if (msg.id == aiMessageId) msg.copy(text = fullResponse.toString()) else msg
+                            if (msg.id == id) msg.copy(text = fullResponse.toString()) else msg
                         }
                     }
                     is StreamEvent.Done -> {
                         _statusMessage.value = null
                         _isLoading.value = false
-                        saveAiMessage(fullResponse.toString())
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
+                            saveAiMessage(fullResponse.toString())
+                        } else if (aiMessageId == null) {
+                            // 没有收到任何内容，创建一条提示
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ AI 未返回内容，请重试", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
+                        }
                     }
                     is StreamEvent.Error -> {
                         _statusMessage.value = null
                         _isLoading.value = false
-                        if (fullResponse.isEmpty()) {
-                            _messages.value = _messages.value.map { msg ->
-                                if (msg.id == aiMessageId) msg.copy(text = "❌ ${event.message}") else msg
-                            }
-                        } else {
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
                             saveAiMessage(fullResponse.toString())
+                        } else {
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ ${event.message}", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
                         }
                     }
                     is StreamEvent.TokenUsage -> {
@@ -286,31 +298,22 @@ class AssistantViewModel @Inject constructor(
             _isLoading.value = false
             _statusMessage.value = null
             val errorMsg = "❌ DeepSeek 连接失败: ${e.message ?: "未知错误"}"
-            if (fullResponse.isEmpty()) {
-                _messages.value = _messages.value.map { msg ->
-                    if (msg.id == aiMessageId) msg.copy(text = errorMsg) else msg
-                }
-            } else {
+            if (aiMessageId != null && fullResponse.isNotEmpty()) {
                 saveAiMessage(fullResponse.toString())
+            } else {
+                val id = System.nanoTime()
+                val errMsg = ChatMessage(id = id, text = errorMsg, isUser = false)
+                _messages.value = (_messages.value + errMsg).takeLast(100)
             }
         }
     }
 
     // ============ Coze 流式对话 ============
     private suspend fun streamChatFromCoze(message: String) {
-        // 创建空的 AI 回复消息占位
-        val aiMessageId = System.nanoTime()
-        val aiMessage = ChatMessage(
-            id = aiMessageId,
-            text = "",
-            isUser = false
-        )
-        _messages.value = (_messages.value + aiMessage).takeLast(100)
-
+        var aiMessageId: Long? = null
         var fullResponse = StringBuilder()
 
         try {
-            // 更新 CozeApiClient 的配置（可能用户在设置中更改了）
             val savedPat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
             val savedBotId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
             val pat = savedPat.ifBlank { Constants.DEFAULT_COZE_PAT }
@@ -332,10 +335,15 @@ class AssistantViewModel @Inject constructor(
                         _statusMessage.value = event.message
                     }
                     is StreamEvent.Delta -> {
+                        if (aiMessageId == null) {
+                            aiMessageId = System.nanoTime()
+                            val newMsg = ChatMessage(id = aiMessageId!!, text = "", isUser = false)
+                            _messages.value = (_messages.value + newMsg).takeLast(100)
+                        }
                         fullResponse.append(event.text)
-                        // 更新 AI 消息内容
+                        val id = aiMessageId!!
                         _messages.value = _messages.value.map { msg ->
-                            if (msg.id == aiMessageId) msg.copy(text = fullResponse.toString()) else msg
+                            if (msg.id == id) msg.copy(text = fullResponse.toString()) else msg
                         }
                     }
                     is StreamEvent.Done -> {
@@ -343,22 +351,26 @@ class AssistantViewModel @Inject constructor(
                         _statusMessage.value = null
                         _isLoading.value = false
 
-                        // 保存到数据库
-                        saveAiMessage(fullResponse.toString())
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
+                            saveAiMessage(fullResponse.toString())
+                        } else if (aiMessageId == null) {
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ AI 未返回内容，请重试", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
+                        }
                     }
                     is StreamEvent.Error -> {
                         _statusMessage.value = null
                         _isLoading.value = false
-                        if (fullResponse.isEmpty()) {
-                            _messages.value = _messages.value.map { msg ->
-                                if (msg.id == aiMessageId) msg.copy(text = "❌ ${event.message}") else msg
-                            }
-                        } else {
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
                             saveAiMessage(fullResponse.toString())
+                        } else {
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ ${event.message}", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
                         }
                     }
                     is StreamEvent.TokenUsage -> {
-                        // 累计 token 消耗
                         accumulateTokenUsage(event.total, event.input, event.output)
                     }
                 }
@@ -367,12 +379,12 @@ class AssistantViewModel @Inject constructor(
             _isLoading.value = false
             _statusMessage.value = null
             val errorMsg = "❌ 连接失败: ${e.message ?: "未知错误"}"
-            if (fullResponse.isEmpty()) {
-                _messages.value = _messages.value.map { msg ->
-                    if (msg.id == aiMessageId) msg.copy(text = errorMsg) else msg
-                }
-            } else {
+            if (aiMessageId != null && fullResponse.isNotEmpty()) {
                 saveAiMessage(fullResponse.toString())
+            } else {
+                val id = System.nanoTime()
+                val errMsg = ChatMessage(id = id, text = errorMsg, isUser = false)
+                _messages.value = (_messages.value + errMsg).takeLast(100)
             }
         }
     }
@@ -411,20 +423,34 @@ class AssistantViewModel @Inject constructor(
         return history
     }
 
-    // ============ Token 消耗累计 ============
+    // ============ Token 消耗累计（分通道） ============
     companion object {
-        private const val KEY_TOTAL_TOKENS = "total_tokens_consumed"
-        private const val KEY_TOTAL_INPUT = "total_input_tokens"
-        private const val KEY_TOTAL_OUTPUT = "total_output_tokens"
-        private const val KEY_TOTAL_MESSAGES = "total_ai_messages"
+        // Coze 通道
+        private const val KEY_COZE_TOTAL_TOKENS = "coze_total_tokens"
+        private const val KEY_COZE_TOTAL_INPUT = "coze_total_input"
+        private const val KEY_COZE_TOTAL_OUTPUT = "coze_total_output"
+        private const val KEY_COZE_TOTAL_MESSAGES = "coze_total_messages"
+        // DeepSeek 通道
+        private const val KEY_DS_TOTAL_TOKENS = "ds_total_tokens"
+        private const val KEY_DS_TOTAL_INPUT = "ds_total_input"
+        private const val KEY_DS_TOTAL_OUTPUT = "ds_total_output"
+        private const val KEY_DS_TOTAL_MESSAGES = "ds_total_messages"
     }
 
     private fun accumulateTokenUsage(total: Int, input: Int, output: Int) {
+        val isCoze = _currentChannel.value == Constants.CHANNEL_COZE
         val editor = securePrefs.edit()
-        editor.putInt(KEY_TOTAL_TOKENS, securePrefs.getInt(KEY_TOTAL_TOKENS, 0) + total)
-        editor.putInt(KEY_TOTAL_INPUT, securePrefs.getInt(KEY_TOTAL_INPUT, 0) + input)
-        editor.putInt(KEY_TOTAL_OUTPUT, securePrefs.getInt(KEY_TOTAL_OUTPUT, 0) + output)
-        editor.putInt(KEY_TOTAL_MESSAGES, securePrefs.getInt(KEY_TOTAL_MESSAGES, 0) + 1)
+        if (isCoze) {
+            editor.putInt(KEY_COZE_TOTAL_TOKENS, securePrefs.getInt(KEY_COZE_TOTAL_TOKENS, 0) + total)
+            editor.putInt(KEY_COZE_TOTAL_INPUT, securePrefs.getInt(KEY_COZE_TOTAL_INPUT, 0) + input)
+            editor.putInt(KEY_COZE_TOTAL_OUTPUT, securePrefs.getInt(KEY_COZE_TOTAL_OUTPUT, 0) + output)
+            editor.putInt(KEY_COZE_TOTAL_MESSAGES, securePrefs.getInt(KEY_COZE_TOTAL_MESSAGES, 0) + 1)
+        } else {
+            editor.putInt(KEY_DS_TOTAL_TOKENS, securePrefs.getInt(KEY_DS_TOTAL_TOKENS, 0) + total)
+            editor.putInt(KEY_DS_TOTAL_INPUT, securePrefs.getInt(KEY_DS_TOTAL_INPUT, 0) + input)
+            editor.putInt(KEY_DS_TOTAL_OUTPUT, securePrefs.getInt(KEY_DS_TOTAL_OUTPUT, 0) + output)
+            editor.putInt(KEY_DS_TOTAL_MESSAGES, securePrefs.getInt(KEY_DS_TOTAL_MESSAGES, 0) + 1)
+        }
         editor.apply()
     }
 
