@@ -303,7 +303,7 @@ class AssistantViewModel @Inject constructor(
                         val list: List<com.meitu.generator.ui.settings.CustomApiConfig> = com.google.gson.Gson().fromJson(customJson, type)
                         val config = list.find { it.id == customId }
                         if (config != null) {
-                            streamChatFromCustom(config)
+                            streamChatFromCustom(config, messageContent)
                         } else {
                             _statusMessage.value = "❌ 自定义 API 配置不存在"
                             _isLoading.value = false
