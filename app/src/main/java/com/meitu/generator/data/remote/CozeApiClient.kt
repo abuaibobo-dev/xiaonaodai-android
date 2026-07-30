@@ -326,6 +326,7 @@ class CozeApiClient(
     fun streamDeepSeekChat(
         apiKey: String,
         message: String,
+        model: String = "deepseek-v4-flash",
         systemPrompt: String? = null,
         history: List<Pair<String, String>> = emptyList()
     ): Flow<StreamEvent> = flow {
@@ -355,7 +356,7 @@ class CozeApiClient(
         })
 
         val requestBody = JsonObject().apply {
-            addProperty("model", "deepseek-chat")
+            addProperty("model", model)
             add("messages", messages)
             addProperty("stream", true)
         }
