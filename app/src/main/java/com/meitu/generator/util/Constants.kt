@@ -19,7 +19,9 @@ object Constants {
     // ============ AI 通道类型 ============
     const val CHANNEL_COZE = "coze"
     const val CHANNEL_DEEPSEEK = "deepseek"
+    const val CHANNEL_CUSTOM_PREFIX = "custom:"
     const val KEY_AI_CHANNEL = "ai_channel"
+    const val KEY_CUSTOM_API_LIST = "custom_api_list"
 
     // 本地数据库名
     const val DB_NAME = "meitu_database"
