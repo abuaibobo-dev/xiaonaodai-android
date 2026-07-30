@@ -384,66 +384,18 @@ private fun SidebarDrawer(
             )
             Spacer(Modifier.height(12.dp))
 
-            var showAvatarMenu by remember { mutableStateOf(false) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(colors.surface)
-                            .clickable { showAvatarMenu = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("\uD83E\uDDE0", fontSize = 16.sp)
-                    }
-
-                    DropdownMenu(
-                        expanded = showAvatarMenu,
-                        onDismissRequest = { showAvatarMenu = false },
-                        modifier = Modifier.background(colors.surface)
-                    ) {
-                        // Coze 设置入口
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🔑", fontSize = 14.sp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Coze API 配置", fontSize = 14.sp, color = colors.textPrimary)
-                                }
-                            },
-                            onClick = {
-                                showAvatarMenu = false
-                                onNavigate(Routes.SETTINGS)
-                            }
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .height(0.5.dp)
-                                .background(colors.border)
-                        )
-
-                        // 关于
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("ℹ️", fontSize = 14.sp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("关于", fontSize = 14.sp, color = colors.textPrimary)
-                                }
-                            },
-                            onClick = {
-                                showAvatarMenu = false
-                                onNavigate(Routes.SETTINGS)
-                            }
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(colors.surface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("\uD83E\uDDE0", fontSize = 16.sp)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
