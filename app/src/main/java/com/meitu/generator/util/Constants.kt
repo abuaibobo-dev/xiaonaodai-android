@@ -28,6 +28,21 @@ object Constants {
 
     // ============ App 信息 ============
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "6.2.1"
-    const val APP_VERSION_CODE = 63
+    const val APP_VERSION = "6.2.2"
+    const val APP_VERSION_CODE = 64
+
+    // ============ GitHub 配置 ============
+    const val KEY_GITHUB_TOKEN = "github_token"
+    const val GITHUB_API_BASE = "https://api.github.com"
+
+    // ============ HuggingFace 配置 ============
+    const val KEY_HF_TOKEN = "hf_token"
+    const val HF_API_BASE = "https://huggingface.co/api"
+
+    // ============ Server酱 / PushPlus 配置 ============
+    const val KEY_SERVERCHAN_KEY = "serverchan_key"
+    const val KEY_PUSHPLUS_TOKEN = "pushplus_token"
+
+    // ============ 通用余额查询 ============
+    const val KEY_BALANCE_CHECK_LIST = "balance_check_list"
 }
