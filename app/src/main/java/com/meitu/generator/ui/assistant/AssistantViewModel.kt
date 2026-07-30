@@ -131,9 +131,19 @@ class AssistantViewModel @Inject constructor(
     private val _isCozeConfigured = MutableStateFlow(false)
     val isCozeConfigured: StateFlow<Boolean> = _isCozeConfigured.asStateFlow()
 
+    // ============ 当前 AI 通道 ============
+    private val _currentChannel = MutableStateFlow(Constants.CHANNEL_COZE)
+    val currentChannel: StateFlow<String> = _currentChannel.asStateFlow()
+
     init {
         checkCozeConfig()
+        loadChannel()
         loadSessionList()
+    }
+
+    private fun loadChannel() {
+        val channel = securePrefs.getString(Constants.KEY_AI_CHANNEL, Constants.CHANNEL_COZE) ?: Constants.CHANNEL_COZE
+        _currentChannel.value = channel
     }
 
     private fun checkCozeConfig() {
@@ -149,6 +159,7 @@ class AssistantViewModel @Inject constructor(
 
     fun refreshCozeConfig() {
         checkCozeConfig()
+        loadChannel()
     }
 
     // ============ 发送消息 ============
@@ -157,9 +168,18 @@ class AssistantViewModel @Inject constructor(
         val imageUri = _pendingImageUri.value
 
         if (text.isEmpty() && imageUri == null) return
-        if (!_isCozeConfigured.value) {
+
+        val channel = _currentChannel.value
+        if (channel == Constants.CHANNEL_COZE && !_isCozeConfigured.value) {
             _statusMessage.value = "请先在设置中配置 Coze PAT 和 Bot ID"
             return
+        }
+        if (channel == Constants.CHANNEL_DEEPSEEK) {
+            val apiKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
+            if (apiKey.isBlank()) {
+                _statusMessage.value = "请先在设置中配置 DeepSeek API Key"
+                return
+            }
         }
 
         // 生成对话名称
@@ -203,11 +223,81 @@ class AssistantViewModel @Inject constructor(
                 }
             }
 
-            // 流式调用 Coze API
-            streamChatFromCoze(messageContent)
+            // 根据通道选择调用
+            when (channel) {
+                Constants.CHANNEL_DEEPSEEK -> streamChatFromDeepSeek(messageContent)
+                else -> streamChatFromCoze(messageContent)
+            }
         }
     }
 
+    // ============ DeepSeek 直连 ============
+    private suspend fun streamChatFromDeepSeek(message: String) {
+        val aiMessageId = System.nanoTime()
+        val aiMessage = ChatMessage(id = aiMessageId, text = "", isUser = false)
+        _messages.value = (_messages.value + aiMessage).takeLast(100)
+
+        var fullResponse = StringBuilder()
+
+        try {
+            val apiKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
+            val systemPrompt = securePrefs.getString("deepseek_system_prompt", "") ?: ""
+
+            // 构建历史对话
+            val history = buildHistoryFromMessages()
+
+            cozeClient.streamDeepSeekChat(
+                apiKey = apiKey,
+                message = message,
+                systemPrompt = systemPrompt.ifBlank { null },
+                history = history
+            ).collect { event ->
+                when (event) {
+                    is StreamEvent.Status -> {
+                        _statusMessage.value = event.message
+                    }
+                    is StreamEvent.Delta -> {
+                        fullResponse.append(event.text)
+                        _messages.value = _messages.value.map { msg ->
+                            if (msg.id == aiMessageId) msg.copy(text = fullResponse.toString()) else msg
+                        }
+                    }
+                    is StreamEvent.Done -> {
+                        _statusMessage.value = null
+                        _isLoading.value = false
+                        saveAiMessage(fullResponse.toString())
+                    }
+                    is StreamEvent.Error -> {
+                        _statusMessage.value = null
+                        _isLoading.value = false
+                        if (fullResponse.isEmpty()) {
+                            _messages.value = _messages.value.map { msg ->
+                                if (msg.id == aiMessageId) msg.copy(text = "❌ ${event.message}") else msg
+                            }
+                        } else {
+                            saveAiMessage(fullResponse.toString())
+                        }
+                    }
+                    is StreamEvent.TokenUsage -> {
+                        accumulateTokenUsage(event.total, event.input, event.output)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            _isLoading.value = false
+            _statusMessage.value = null
+            val errorMsg = "❌ DeepSeek 连接失败: ${e.message ?: "未知错误"}"
+            if (fullResponse.isEmpty()) {
+                _messages.value = _messages.value.map { msg ->
+                    if (msg.id == aiMessageId) msg.copy(text = errorMsg) else msg
+                }
+            } else {
+                saveAiMessage(fullResponse.toString())
+            }
+        }
+    }
+
+    // ============ Coze 流式对话 ============
     private suspend fun streamChatFromCoze(message: String) {
         // 创建空的 AI 回复消息占位
         val aiMessageId = System.nanoTime()
@@ -307,6 +397,19 @@ class AssistantViewModel @Inject constructor(
                 ))
             } catch (_: Exception) {}
         }
+    }
+
+    // ============ 构建历史对话 ============
+    private fun buildHistoryFromMessages(): List<Pair<String, String>> {
+        val history = mutableListOf<Pair<String, String>>()
+        val chatMessages = _messages.value.filter { !it.isSystem }
+        // 取最近的对话（排除空的AI占位消息）
+        for (msg in chatMessages) {
+            if (msg.text.isNotBlank()) {
+                history.add(Pair(if (msg.isUser) "user" else "assistant", msg.text))
+            }
+        }
+        return history
     }
 
     // ============ Token 消耗累计 ============
