@@ -606,24 +606,13 @@ class SettingsViewModel @Inject constructor(
                                     val balanceInfos = json.getAsJsonArray("balance_infos")
                                     if (balanceInfos != null && balanceInfos.size() > 0) {
                                         "¥${balanceInfos[0].asJsonObject.get("total_balance")?.asString ?: "?"}"
-                                    }
-                                    // 格式2: 硅基流动 → data.balance
-                                    else {
+                                    } else {
                                         val data = json.getAsJsonObject("data")
-                                        if (data != null && data.get("balance") != null) {
-                                            "¥${data.get("balance")?.asString ?: data.get("balance")?.asNumber ?: "?"}"
-                                        }
-                                        // 格式3: 直接返回 balance 字段
-                                        else if (json.get("balance") != null) {
-                                            "¥${json.get("balance")?.asString ?: json.get("balance")?.asNumber ?: "?"}"
-                                        }
-                                        // 格式4: total_balance 在顶层
-                                        else if (json.get("total_balance") != null) {
-                                            "¥${json.get("total_balance")?.asString ?: "?"}"
-                                        }
-                                        // 格式5: 显示原始JSON
-                                        else {
-                                            text.take(200)
+                                        when {
+                                            data != null && data.get("balance") != null -> "¥${data.get("balance")?.asString ?: data.get("balance")?.asNumber ?: "?"}"
+                                            json.get("balance") != null -> "¥${json.get("balance")?.asString ?: json.get("balance")?.asNumber ?: "?"}"
+                                            json.get("total_balance") != null -> "¥${json.get("total_balance")?.asString ?: "?"}"
+                                            else -> text.take(200)
                                         }
                                     }
                                 } catch (_: Exception) {
