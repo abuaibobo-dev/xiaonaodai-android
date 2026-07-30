@@ -26,6 +26,6 @@ object Constants {
 
     // ============ App 信息 ============
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "6.2.0"
-    const val APP_VERSION_CODE = 62
+    const val APP_VERSION = "6.2.1"
+    const val APP_VERSION_CODE = 63
 }
