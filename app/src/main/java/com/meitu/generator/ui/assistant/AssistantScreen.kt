@@ -338,7 +338,7 @@ private fun EmptyState() {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text("⭐", fontSize = 28.sp)
+                Text("🧠", fontSize = 28.sp)
             }
 
             Spacer(Modifier.height(8.dp))
