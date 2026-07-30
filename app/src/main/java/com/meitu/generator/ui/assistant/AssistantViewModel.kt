@@ -145,6 +145,56 @@ class AssistantViewModel @Inject constructor(
         _currentChannel.value = channel
     }
 
+    /**
+     * 获取所有可用通道列表，用于循环切换
+     */
+    private fun getAvailableChannels(): List<String> {
+        val channels = mutableListOf(Constants.CHANNEL_COZE, Constants.CHANNEL_DEEPSEEK)
+        val customJson = securePrefs.getString(Constants.KEY_CUSTOM_API_LIST, "[]") ?: "[]"
+        try {
+            val type = object : com.google.gson.reflect.TypeToken<List<com.meitu.generator.ui.settings.CustomApiConfig>>() {}.type
+            val customList: List<com.meitu.generator.ui.settings.CustomApiConfig> = com.google.gson.Gson().fromJson(customJson, type)
+            for (c in customList) {
+                channels.add("${Constants.CHANNEL_CUSTOM_PREFIX}${c.id}")
+            }
+        } catch (_: Exception) {}
+        return channels
+    }
+
+    /**
+     * 获取当前通道的显示标签
+     */
+    fun getChannelLabel(): String {
+        val ch = _currentChannel.value
+        return when {
+            ch == Constants.CHANNEL_COZE -> "🧠 Coze"
+            ch == Constants.CHANNEL_DEEPSEEK -> "DeepSeek"
+            ch.startsWith(Constants.CHANNEL_CUSTOM_PREFIX) -> {
+                val id = ch.removePrefix(Constants.CHANNEL_CUSTOM_PREFIX)
+                val customJson = securePrefs.getString(Constants.KEY_CUSTOM_API_LIST, "[]") ?: "[]"
+                try {
+                    val type = object : com.google.gson.reflect.TypeToken<List<com.meitu.generator.ui.settings.CustomApiConfig>>() {}.type
+                    val list: List<com.meitu.generator.ui.settings.CustomApiConfig> = com.google.gson.Gson().fromJson(customJson, type)
+                    val config = list.find { it.id == id }
+                    "${config?.emoji ?: "🔌"} ${config?.name ?: "自定义"}"
+                } catch (_: Exception) { "🔌 自定义" }
+            }
+            else -> "🧠 Coze"
+        }
+    }
+
+    /**
+     * 循环切换到下一个通道
+     */
+    fun cycleChannel() {
+        val channels = getAvailableChannels()
+        val currentIdx = channels.indexOf(_currentChannel.value)
+        val nextIdx = if (currentIdx < 0 || currentIdx >= channels.size - 1) 0 else currentIdx + 1
+        val nextChannel = channels[nextIdx]
+        securePrefs.edit().putString(Constants.KEY_AI_CHANNEL, nextChannel).apply()
+        _currentChannel.value = nextChannel
+    }
+
     private fun checkCozeConfig() {
         viewModelScope.launch {
             val savedPat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
@@ -223,8 +273,26 @@ class AssistantViewModel @Inject constructor(
             }
 
             // 根据通道选择调用
-            when (channel) {
-                Constants.CHANNEL_DEEPSEEK -> streamChatFromDeepSeek(messageContent)
+            when {
+                channel == Constants.CHANNEL_DEEPSEEK -> streamChatFromDeepSeek(messageContent)
+                channel.startsWith(Constants.CHANNEL_CUSTOM_PREFIX) -> {
+                    val customId = channel.removePrefix(Constants.CHANNEL_CUSTOM_PREFIX)
+                    val customJson = securePrefs.getString(Constants.KEY_CUSTOM_API_LIST, "[]") ?: "[]"
+                    try {
+                        val type = object : com.google.gson.reflect.TypeToken<List<com.meitu.generator.ui.settings.CustomApiConfig>>() {}.type
+                        val list: List<com.meitu.generator.ui.settings.CustomApiConfig> = com.google.gson.Gson().fromJson(customJson, type)
+                        val config = list.find { it.id == customId }
+                        if (config != null) {
+                            streamChatFromCustom(config)
+                        } else {
+                            _statusMessage.value = "❌ 自定义 API 配置不存在"
+                            _isLoading.value = false
+                        }
+                    } catch (_: Exception) {
+                        _statusMessage.value = "❌ 读取自定义配置失败"
+                        _isLoading.value = false
+                    }
+                }
                 else -> streamChatFromCoze(messageContent)
             }
         }
@@ -297,6 +365,80 @@ class AssistantViewModel @Inject constructor(
             _isLoading.value = false
             _statusMessage.value = null
             val errorMsg = "❌ DeepSeek 连接失败: ${e.message ?: "未知错误"}"
+            if (aiMessageId != null && fullResponse.isNotEmpty()) {
+                saveAiMessage(fullResponse.toString())
+            } else {
+                val id = System.nanoTime()
+                val errMsg = ChatMessage(id = id, text = errorMsg, isUser = false)
+                _messages.value = (_messages.value + errMsg).takeLast(100)
+            }
+        }
+    }
+
+    // ============ 自定义 API 流式对话 ============
+    private suspend fun streamChatFromCustom(config: com.meitu.generator.ui.settings.CustomApiConfig, message: String) {
+        var aiMessageId: Long? = null
+        var fullResponse = StringBuilder()
+
+        try {
+            val systemPrompt = securePrefs.getString("deepseek_system_prompt", "") ?: ""
+            val history = buildHistoryFromMessages()
+
+            cozeClient.streamCustomChat(
+                apiKey = config.apiKey,
+                message = message,// 确保传入实际用户消息
+                model = config.model,
+                baseUrl = config.baseUrl,
+                systemPrompt = systemPrompt.ifBlank { null },
+                history = history
+            ).collect { event ->
+                when (event) {
+                    is StreamEvent.Status -> {
+                        _statusMessage.value = event.message
+                    }
+                    is StreamEvent.Delta -> {
+                        if (aiMessageId == null) {
+                            aiMessageId = System.nanoTime()
+                            val newMsg = ChatMessage(id = aiMessageId!!, text = "", isUser = false)
+                            _messages.value = (_messages.value + newMsg).takeLast(100)
+                        }
+                        fullResponse.append(event.text)
+                        val id = aiMessageId!!
+                        _messages.value = _messages.value.map { msg ->
+                            if (msg.id == id) msg.copy(text = fullResponse.toString()) else msg
+                        }
+                    }
+                    is StreamEvent.Done -> {
+                        _statusMessage.value = null
+                        _isLoading.value = false
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
+                            saveAiMessage(fullResponse.toString())
+                        } else if (aiMessageId == null) {
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ API 未返回内容，请检查配置", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
+                        }
+                    }
+                    is StreamEvent.Error -> {
+                        _statusMessage.value = null
+                        _isLoading.value = false
+                        if (aiMessageId != null && fullResponse.isNotEmpty()) {
+                            saveAiMessage(fullResponse.toString())
+                        } else {
+                            val id = System.nanoTime()
+                            val errMsg = ChatMessage(id = id, text = "❌ ${event.message}", isUser = false)
+                            _messages.value = (_messages.value + errMsg).takeLast(100)
+                        }
+                    }
+                    is StreamEvent.TokenUsage -> {
+                        accumulateTokenUsage(event.total, event.input, event.output)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            _isLoading.value = false
+            _statusMessage.value = null
+            val errorMsg = "❌ 自定义 API 连接失败: ${e.message ?: "未知错误"}"
             if (aiMessageId != null && fullResponse.isNotEmpty()) {
                 saveAiMessage(fullResponse.toString())
             } else {
@@ -422,7 +564,7 @@ class AssistantViewModel @Inject constructor(
         return history
     }
 
-    // ============ Token 消耗累计（分通道） ============
+    // ============ Token 消耗累计（分通道，支持自定义） ============
     companion object {
         // Coze 通道
         private const val KEY_COZE_TOTAL_TOKENS = "coze_total_tokens"
@@ -434,22 +576,25 @@ class AssistantViewModel @Inject constructor(
         private const val KEY_DS_TOTAL_INPUT = "ds_total_input"
         private const val KEY_DS_TOTAL_OUTPUT = "ds_total_output"
         private const val KEY_DS_TOTAL_MESSAGES = "ds_total_messages"
+        // 自定义通道前缀
+        private const val KEY_CUSTOM_PREFIX = "custom:"
     }
 
     private fun accumulateTokenUsage(total: Int, input: Int, output: Int) {
-        val isCoze = _currentChannel.value == Constants.CHANNEL_COZE
+        val channel = _currentChannel.value
         val editor = securePrefs.edit()
-        if (isCoze) {
-            editor.putInt(KEY_COZE_TOTAL_TOKENS, securePrefs.getInt(KEY_COZE_TOTAL_TOKENS, 0) + total)
-            editor.putInt(KEY_COZE_TOTAL_INPUT, securePrefs.getInt(KEY_COZE_TOTAL_INPUT, 0) + input)
-            editor.putInt(KEY_COZE_TOTAL_OUTPUT, securePrefs.getInt(KEY_COZE_TOTAL_OUTPUT, 0) + output)
-            editor.putInt(KEY_COZE_TOTAL_MESSAGES, securePrefs.getInt(KEY_COZE_TOTAL_MESSAGES, 0) + 1)
-        } else {
-            editor.putInt(KEY_DS_TOTAL_TOKENS, securePrefs.getInt(KEY_DS_TOTAL_TOKENS, 0) + total)
-            editor.putInt(KEY_DS_TOTAL_INPUT, securePrefs.getInt(KEY_DS_TOTAL_INPUT, 0) + input)
-            editor.putInt(KEY_DS_TOTAL_OUTPUT, securePrefs.getInt(KEY_DS_TOTAL_OUTPUT, 0) + output)
-            editor.putInt(KEY_DS_TOTAL_MESSAGES, securePrefs.getInt(KEY_DS_TOTAL_MESSAGES, 0) + 1)
+
+        val prefix = when {
+            channel == Constants.CHANNEL_COZE -> "coze"
+            channel == Constants.CHANNEL_DEEPSEEK -> "ds"
+            channel.startsWith(KEY_CUSTOM_PREFIX) -> channel // custom:{id}
+            else -> "coze"
         }
+
+        editor.putInt("${prefix}_total_tokens", securePrefs.getInt("${prefix}_total_tokens", 0) + total)
+        editor.putInt("${prefix}_total_input", securePrefs.getInt("${prefix}_total_input", 0) + input)
+        editor.putInt("${prefix}_total_output", securePrefs.getInt("${prefix}_total_output", 0) + output)
+        editor.putInt("${prefix}_total_messages", securePrefs.getInt("${prefix}_total_messages", 0) + 1)
         editor.apply()
     }
 
