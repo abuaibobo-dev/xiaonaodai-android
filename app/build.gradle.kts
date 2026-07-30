@@ -40,10 +40,6 @@ android {
         jvmTarget = "17"
     }
 
-    ksp {
-        arg("ksp.incremental", "false")
-    }
-
     buildFeatures {
         compose = true
     }
@@ -51,6 +47,10 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"
     }
+}
+
+ksp {
+    arg("ksp.incremental", "false")
 }
 
 dependencies {
