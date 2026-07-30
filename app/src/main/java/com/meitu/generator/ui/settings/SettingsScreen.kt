@@ -41,6 +41,31 @@ fun SettingsScreen(
     val deepseekBalance by viewModel.deepseekBalance.collectAsState()
     val isLoadingBalance by viewModel.isLoadingBalance.collectAsState()
     val customApiList by viewModel.customApiList.collectAsState()
+    val githubToken by viewModel.githubToken.collectAsState()
+    val githubUser by viewModel.githubUser.collectAsState()
+    val githubRepos by viewModel.githubRepos.collectAsState()
+    val githubNotifications by viewModel.githubNotifications.collectAsState()
+    val selectedRepoCommits by viewModel.selectedRepoCommits.collectAsState()
+    val isLoadingGitHub by viewModel.isLoadingGitHub.collectAsState()
+    val githubError by viewModel.githubError.collectAsState()
+
+    // HuggingFace
+    val hfToken by viewModel.hfToken.collectAsState()
+    val hfModels by viewModel.hfModels.collectAsState()
+    val isLoadingHf by viewModel.isLoadingHf.collectAsState()
+    val hfError by viewModel.hfError.collectAsState()
+    val hfTrendingTag by viewModel.hfTrendingTag.collectAsState()
+
+    // 推送
+    val serverchanKey by viewModel.serverchanKey.collectAsState()
+    val pushplusToken by viewModel.pushplusToken.collectAsState()
+    val pushTestResult by viewModel.pushTestResult.collectAsState()
+    val isTestingPush by viewModel.isTestingPush.collectAsState()
+
+    // 通用余额查询
+    val balanceServices by viewModel.balanceServices.collectAsState()
+    val balanceResults by viewModel.balanceResults.collectAsState()
+    val isLoadingBalanceCheck by viewModel.isLoadingBalanceCheck.collectAsState()
 
     var showPatDialog by remember { mutableStateOf(false) }
     var showBotIdDialog by remember { mutableStateOf(false) }
@@ -50,6 +75,19 @@ fun SettingsScreen(
     var deepseekKeyInput by remember { mutableStateOf("") }
     var showCustomApiDialog by remember { mutableStateOf(false) }
     var editingCustomApi by remember { mutableStateOf<CustomApiConfig?>(null) }
+    var showGitHubTokenDialog by remember { mutableStateOf(false) }
+    var showGitHubCommits by remember { mutableStateOf<String?>(null) }
+    var showHfTokenDialog by remember { mutableStateOf(false) }
+    var hfTokenInput by remember { mutableStateOf("") }
+    var hfSearchInput by remember { mutableStateOf("") }
+    var showServerchanDialog by remember { mutableStateOf(false) }
+    var serverchanInput by remember { mutableStateOf("") }
+    var showPushplusDialog by remember { mutableStateOf(false) }
+    var pushplusInput by remember { mutableStateOf("") }
+    var showAddBalanceServiceDialog by remember { mutableStateOf(false) }
+    var balanceServiceNameInput by remember { mutableStateOf("") }
+    var balanceServiceUrlInput by remember { mutableStateOf("") }
+    var balanceServiceKeyInput by remember { mutableStateOf("") }
 
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
@@ -334,6 +372,378 @@ fun SettingsScreen(
                 }
             }
 
+            // ============ GitHub 关联 ============
+            item { SectionTitle("GitHub 关联") }
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.Card))
+                        .background(colors.surface)
+                        .padding(Spacing.CardSpacing)
+                ) {
+                    // Token 输入
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Token", fontSize = 14.sp, color = colors.textPrimary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                if (githubToken.isNotBlank()) "已设置" else "未设置",
+                                fontSize = 12.sp,
+                                color = if (githubToken.isNotBlank()) colors.success else colors.textTertiary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(
+                                onClick = { showGitHubTokenDialog = true },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    if (githubUser != null) {
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border).padding(vertical = 4.dp))
+                        Spacer(Modifier.height(8.dp))
+
+                        // 用户信息
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(githubUser!!.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("@${githubUser!!.login}", fontSize = 12.sp, color = colors.textTertiary)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row {
+                            Text("${githubUser!!.publicRepos} 仓库", fontSize = 12.sp, color = colors.textSecondary)
+                            Spacer(Modifier.width(12.dp))
+                            Text("${githubUser!!.followers} 关注者", fontSize = 12.sp, color = colors.textSecondary)
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                        Spacer(Modifier.height(8.dp))
+
+                        // 刷新按钮
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("仓库列表", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            if (isLoadingGitHub) {
+                                Text("加载中...", fontSize = 12.sp, color = colors.textTertiary)
+                            } else {
+                                Text(
+                                    "刷新",
+                                    fontSize = 12.sp, color = colors.accent,
+                                    modifier = Modifier.clickable { viewModel.refreshGitHubData() }
+                                )
+                            }
+                        }
+
+                        // 仓库列表
+                        if (githubRepos.isEmpty() && !isLoadingGitHub) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("暂无仓库", fontSize = 12.sp, color = colors.textTertiary)
+                        } else {
+                            githubRepos.take(5).forEach { repo ->
+                                Spacer(Modifier.height(6.dp))
+                                Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border.copy(alpha = 0.3f)))
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showGitHubCommits = repo.fullName; viewModel.loadRepoCommits(repo.fullName) },
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(repo.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                                        if (repo.description.isNotBlank()) {
+                                            Text(repo.description, fontSize = 11.sp, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                        Row {
+                                            if (repo.language != null) {
+                                                Text("${repo.language}", fontSize = 10.sp, color = colors.textSecondary)
+                                                Spacer(Modifier.width(8.dp))
+                                            }
+                                            Text("⭐${repo.stars}", fontSize = 10.sp, color = colors.textSecondary)
+                                        }
+                                    }
+                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = colors.textTertiary, modifier = Modifier.size(18.dp).align(Alignment.CenterVertically))
+                                }
+                            }
+                            if (githubRepos.size > 5) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("还有 ${githubRepos.size - 5} 个仓库...", fontSize = 11.sp, color = colors.textTertiary)
+                            }
+                        }
+
+                        // 通知
+                        if (githubNotifications.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                            Spacer(Modifier.height(8.dp))
+                            Text("通知 (${githubNotifications.size})", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            githubNotifications.take(5).forEach { n ->
+                                Spacer(Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (n.type == "Issue") "🐛" else "🔄", fontSize = 12.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(n.title, fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${n.repoName} · ${n.updatedAt}", fontSize = 10.sp, color = colors.textTertiary)
+                                    }
+                                }
+                            }
+                        }
+
+                        // 提交记录
+                        if (showGitHubCommits != null && selectedRepoCommits.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("最近提交 · ${showGitHubCommits}", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                                Text("收起", fontSize = 12.sp, color = colors.accent, modifier = Modifier.clickable { showGitHubCommits = null })
+                            }
+                            selectedRepoCommits.forEach { c ->
+                                Spacer(Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(c.sha, fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = colors.accent)
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(c.message, fontSize = 12.sp, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${c.author} · ${c.date}", fontSize = 10.sp, color = colors.textTertiary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (githubError != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("⚠️ ${githubError}", fontSize = 12.sp, color = colors.error ?: colors.textTertiary)
+                    }
+                }
+            }
+
+            // ============ HuggingFace ============
+            item { SectionTitle("HuggingFace 模型搜索") }
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(CornerRadius.Card)).background(colors.surface).padding(Spacing.CardSpacing)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Token", fontSize = 14.sp, color = colors.textPrimary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (hfToken.isNotBlank()) "已设置" else "未设置", fontSize = 12.sp, color = if (hfToken.isNotBlank()) colors.success else colors.textTertiary)
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(onClick = { hfTokenInput = hfToken; showHfTokenDialog = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                    Spacer(Modifier.height(8.dp))
+
+                    // 搜索框
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = hfSearchInput, onValueChange = { hfSearchInput = it },
+                            placeholder = { Text("搜索模型...", fontSize = 13.sp, color = colors.textTertiary) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(
+                            onClick = { viewModel.searchHfModels(hfSearchInput) },
+                            enabled = hfSearchInput.isNotBlank() && !isLoadingHf,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) { Text("搜索", fontSize = 13.sp, color = colors.accent) }
+                    }
+
+                    // 分类标签
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("text-generation", "image-generation", "voice", "embedding").forEach { tag ->
+                            val label = when (tag) { "text-generation" -> "文本生成"; "image-generation" -> "图像生成"; "voice" -> "语音"; else -> "嵌入" }
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (hfTrendingTag == tag) colors.accent.copy(alpha = 0.15f) else colors.background)
+                                    .clickable { viewModel.loadHfTrending(tag) }.padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(label, fontSize = 11.sp, color = if (hfTrendingTag == tag) colors.accent else colors.textSecondary, fontWeight = if (hfTrendingTag == tag) FontWeight.SemiBold else FontWeight.Normal)
+                            }
+                        }
+                    }
+
+                    // 结果
+                    if (isLoadingHf) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("加载中...", fontSize = 12.sp, color = colors.textTertiary)
+                    }
+                    if (hfError != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("⚠️ ${hfError}", fontSize = 12.sp, color = colors.error ?: colors.textTertiary)
+                    }
+                    hfModels.take(5).forEach { model ->
+                        Spacer(Modifier.height(6.dp))
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border.copy(alpha = 0.3f)))
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(model.modelId.substringAfterLast("/"), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                                Text(model.author, fontSize = 10.sp, color = colors.textTertiary)
+                                Row {
+                                    Text("📥 ${(model.downloads.toInt()).formatTokenCount()}", fontSize = 10.sp, color = colors.textSecondary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("❤️ ${model.likes}", fontSize = 10.sp, color = colors.textSecondary)
+                                }
+                            }
+                            Text(model.pipelineTag, fontSize = 10.sp, color = colors.accent)
+                        }
+                    }
+                }
+            }
+
+            // ============ 消息推送 ============
+            item { SectionTitle("消息推送") }
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(CornerRadius.Card)).background(colors.surface).padding(Spacing.CardSpacing)
+                ) {
+                    // Server酱
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Server酱 SendKey", fontSize = 14.sp, color = colors.textPrimary)
+                            Text(if (serverchanKey.isNotBlank()) "已设置" else "未设置", fontSize = 11.sp, color = if (serverchanKey.isNotBlank()) colors.success else colors.textTertiary)
+                        }
+                        Row {
+                            if (serverchanKey.isNotBlank()) {
+                                TextButton(onClick = { viewModel.testServerchan() }, enabled = !isTestingPush, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                                    Text(if (isTestingPush) "测试中..." else "测试", fontSize = 12.sp, color = colors.accent)
+                                }
+                            }
+                            IconButton(onClick = { serverchanInput = serverchanKey; showServerchanDialog = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(0.5.dp).background(colors.border))
+
+                    // PushPlus
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("PushPlus Token", fontSize = 14.sp, color = colors.textPrimary)
+                            Text(if (pushplusToken.isNotBlank()) "已设置" else "未设置", fontSize = 11.sp, color = if (pushplusToken.isNotBlank()) colors.success else colors.textTertiary)
+                        }
+                        Row {
+                            if (pushplusToken.isNotBlank()) {
+                                TextButton(onClick = { viewModel.testPushplus() }, enabled = !isTestingPush, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                                    Text(if (isTestingPush) "测试中..." else "测试", fontSize = 12.sp, color = colors.accent)
+                                }
+                            }
+                            IconButton(onClick = { pushplusInput = pushplusToken; showPushplusDialog = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    // 测试结果
+                    if (pushTestResult != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(pushTestResult!!, fontSize = 12.sp, color = if (pushTestResult!!.startsWith("✅")) colors.success else (colors.error ?: colors.textTertiary))
+                    }
+                }
+            }
+
+            // ============ 通用余额查询 ============
+            item { SectionTitle("通用余额查询") }
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(CornerRadius.Card)).background(colors.surface).padding(Spacing.CardSpacing)
+                ) {
+                    if (balanceServices.isEmpty()) {
+                        Text("暂无余额查询服务", fontSize = 13.sp, color = colors.textTertiary)
+                    } else {
+                        balanceServices.forEachIndexed { index, service ->
+                            if (index > 0) { Spacer(Modifier.height(6.dp)); Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border)); Spacer(Modifier.height(6.dp)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(service.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                                    Text(service.baseUrl, fontSize = 10.sp, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (balanceResults.containsKey(service.id)) {
+                                        Text("余额: ${balanceResults[service.id]}", fontSize = 12.sp, color = colors.success)
+                                    }
+                                }
+                                Row {
+                                    TextButton(onClick = { viewModel.queryBalance(service.id) }, enabled = !isLoadingBalanceCheck, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                                        Text("查询", fontSize = 12.sp, color = colors.accent)
+                                    }
+                                    IconButton(onClick = { viewModel.deleteBalanceService(service.id) }, modifier = Modifier.size(28.dp)) {
+                                        Text("✕", fontSize = 14.sp, color = colors.error ?: colors.textTertiary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable {
+                            balanceServiceNameInput = ""; balanceServiceUrlInput = ""; balanceServiceKeyInput = ""; showAddBalanceServiceDialog = true
+                        }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("＋ 添加余额查询", fontSize = 14.sp, color = colors.accent)
+                    }
+
+                    // 一键查询
+                    if (balanceServices.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { viewModel.queryAllBalances() },
+                            enabled = !isLoadingBalanceCheck,
+                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                        ) {
+                            Text(if (isLoadingBalanceCheck) "查询中..." else "🔄 一键查询全部", fontSize = 13.sp, color = colors.accent)
+                        }
+                    }
+                }
+            }
+
             // ============ 使用说明 ============
             item { SectionTitle("使用说明") }
             item {
@@ -558,6 +968,153 @@ fun SettingsScreen(
                 ) { Text("保存") }
             },
             dismissButton = { TextButton(onClick = { showCustomApiDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // ============ HuggingFace Token 编辑弹窗 ============
+    if (showHfTokenDialog) {
+        AlertDialog(
+            onDismissRequest = { showHfTokenDialog = false },
+            containerColor = colors.surface,
+            title = { Text("HuggingFace Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 huggingface.co/settings/tokens 获取（可选）", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = hfTokenInput, onValueChange = { hfTokenInput = it },
+                        label = { Text("Token", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveHfToken(hfTokenInput.trim()); showHfTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showHfTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // ============ Server酱 Key 编辑弹窗 ============
+    if (showServerchanDialog) {
+        AlertDialog(
+            onDismissRequest = { showServerchanDialog = false },
+            containerColor = colors.surface,
+            title = { Text("Server酱 SendKey", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 sct.ftqq.com 获取 SendKey", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = serverchanInput, onValueChange = { serverchanInput = it },
+                        label = { Text("SendKey", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveServerchanKey(serverchanInput.trim()); showServerchanDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showServerchanDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // ============ PushPlus Token 编辑弹窗 ============
+    if (showPushplusDialog) {
+        AlertDialog(
+            onDismissRequest = { showPushplusDialog = false },
+            containerColor = colors.surface,
+            title = { Text("PushPlus Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 www.pushplus.plus 获取 Token", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = pushplusInput, onValueChange = { pushplusInput = it },
+                        label = { Text("Token", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.savePushplusToken(pushplusInput.trim()); showPushplusDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showPushplusDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
+    // ============ 添加余额查询服务弹窗 ============
+    if (showAddBalanceServiceDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddBalanceServiceDialog = false },
+            containerColor = colors.surface,
+            title = { Text("添加余额查询", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("支持 DeepSeek、硅基流动等常见 AI 服务商", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = balanceServiceNameInput, onValueChange = { balanceServiceNameInput = it },
+                        label = { Text("名称", color = colors.textTertiary) },
+                        placeholder = { Text("如：硅基流动", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = balanceServiceUrlInput, onValueChange = { balanceServiceUrlInput = it },
+                        label = { Text("Base URL", color = colors.textTertiary) },
+                        placeholder = { Text("https://api.deepseek.com", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = balanceServiceKeyInput, onValueChange = { balanceServiceKeyInput = it },
+                        label = { Text("API Key", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (balanceServiceNameInput.isNotBlank() && balanceServiceUrlInput.isNotBlank() && balanceServiceKeyInput.isNotBlank()) {
+                            viewModel.addBalanceService(balanceServiceNameInput.trim(), balanceServiceUrlInput.trim(), balanceServiceKeyInput.trim())
+                            showAddBalanceServiceDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent),
+                    enabled = balanceServiceNameInput.isNotBlank() && balanceServiceUrlInput.isNotBlank() && balanceServiceKeyInput.isNotBlank()
+                ) { Text("添加") }
+            },
+            dismissButton = { TextButton(onClick = { showAddBalanceServiceDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
     }
 }
