@@ -9,8 +9,10 @@ import com.meitu.generator.util.Constants
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -163,21 +165,23 @@ class SettingsViewModel @Inject constructor(
         _isLoadingBalance.value = true
         viewModelScope.launch {
             try {
-                val url = java.net.URL("https://api.deepseek.com/user/balance")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.setRequestProperty("Authorization", "Bearer $apiKey")
-                conn.setRequestProperty("Accept", "application/json")
-                conn.connectTimeout = 10000
-                conn.readTimeout = 10000
-                val response = conn.inputStream.bufferedReader().readText()
-                conn.disconnect()
-                val json = com.google.gson.JsonParser.parseString(response).asJsonObject
-                val balance = json.get("balance")?.asString
-                val toppedUp = json.get("topped_up_balance")?.asString
-                _deepseekBalance.value = if (balance != null) "¥$balance" else "查询失败"
+                val result = withContext(Dispatchers.IO) {
+                    val url = java.net.URL("https://api.deepseek.com/user/balance")
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("Authorization", "Bearer $apiKey")
+                    conn.setRequestProperty("Accept", "application/json")
+                    conn.connectTimeout = 10000
+                    conn.readTimeout = 10000
+                    val response = conn.inputStream.bufferedReader().readText()
+                    conn.disconnect()
+                    val json = com.google.gson.JsonParser.parseString(response).asJsonObject
+                    val balance = json.get("balance")?.asString
+                    if (balance != null) "¥$balance" else "查询失败"
+                }
+                _deepseekBalance.value = result
             } catch (e: Exception) {
-                _deepseekBalance.value = "查询失败: ${e.message}"
+                _deepseekBalance.value = "查询失败: ${e.message ?: "网络异常"}"
             } finally {
                 _isLoadingBalance.value = false
             }
