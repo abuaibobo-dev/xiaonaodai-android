@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -55,6 +58,7 @@ fun SettingsScreen(
     val isLoadingHf by viewModel.isLoadingHf.collectAsState()
     val hfError by viewModel.hfError.collectAsState()
     val hfTrendingTag by viewModel.hfTrendingTag.collectAsState()
+    val context = LocalContext.current
 
     // 推送
     val serverchanKey by viewModel.serverchanKey.collectAsState()
@@ -296,8 +300,7 @@ fun SettingsScreen(
                                 }
                                 TextButton(
                                     onClick = {
-                                        val ctx = androidx.compose.ui.platform.LocalContext.current
-                                        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://platform.deepseek.com/usage")))
+                                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://platform.deepseek.com/usage")))
                                     },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
