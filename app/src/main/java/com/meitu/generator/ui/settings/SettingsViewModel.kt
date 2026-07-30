@@ -43,18 +43,30 @@ class SettingsViewModel @Inject constructor(
     private val _isUsingDefaultBotId = MutableStateFlow(true)
     val isUsingDefaultBotId: StateFlow<Boolean> = _isUsingDefaultBotId.asStateFlow()
 
-    // ============ Token 消耗统计 ============
+    // ============ Token 消耗统计（分通道） ============
+    // Coze 通道
+    private val _cozeTokens = MutableStateFlow(0)
+    val cozeTokens: StateFlow<Int> = _cozeTokens.asStateFlow()
+    private val _cozeInputTokens = MutableStateFlow(0)
+    val cozeInputTokens: StateFlow<Int> = _cozeInputTokens.asStateFlow()
+    private val _cozeOutputTokens = MutableStateFlow(0)
+    val cozeOutputTokens: StateFlow<Int> = _cozeOutputTokens.asStateFlow()
+    private val _cozeMessages = MutableStateFlow(0)
+    val cozeMessages: StateFlow<Int> = _cozeMessages.asStateFlow()
+
+    // DeepSeek 通道
+    private val _dsTokens = MutableStateFlow(0)
+    val dsTokens: StateFlow<Int> = _dsTokens.asStateFlow()
+    private val _dsInputTokens = MutableStateFlow(0)
+    val dsInputTokens: StateFlow<Int> = _dsInputTokens.asStateFlow()
+    private val _dsOutputTokens = MutableStateFlow(0)
+    val dsOutputTokens: StateFlow<Int> = _dsOutputTokens.asStateFlow()
+    private val _dsMessages = MutableStateFlow(0)
+    val dsMessages: StateFlow<Int> = _dsMessages.asStateFlow()
+
+    // 合计
     private val _totalTokens = MutableStateFlow(0)
     val totalTokens: StateFlow<Int> = _totalTokens.asStateFlow()
-
-    private val _totalInputTokens = MutableStateFlow(0)
-    val totalInputTokens: StateFlow<Int> = _totalInputTokens.asStateFlow()
-
-    private val _totalOutputTokens = MutableStateFlow(0)
-    val totalOutputTokens: StateFlow<Int> = _totalOutputTokens.asStateFlow()
-
-    private val _totalMessages = MutableStateFlow(0)
-    val totalMessages: StateFlow<Int> = _totalMessages.asStateFlow()
 
     // ============ AI 通道 ============
     private val _currentChannel = MutableStateFlow(Constants.CHANNEL_COZE)
@@ -62,6 +74,16 @@ class SettingsViewModel @Inject constructor(
 
     private val _deepseekApiKey = MutableStateFlow("")
     val deepseekApiKey: StateFlow<String> = _deepseekApiKey.asStateFlow()
+
+    // ============ DeepSeek 模型选择 ============
+    private val _deepseekModel = MutableStateFlow("deepseek-v4-flash")
+    val deepseekModel: StateFlow<String> = _deepseekModel.asStateFlow()
+
+    // ============ DeepSeek 余额 ============
+    private val _deepseekBalance = MutableStateFlow<String?>(null)
+    val deepseekBalance: StateFlow<String?> = _deepseekBalance.asStateFlow()
+    private val _isLoadingBalance = MutableStateFlow(false)
+    val isLoadingBalance: StateFlow<Boolean> = _isLoadingBalance.asStateFlow()
 
     // ============ Agent 管理 ============
     private val _agentList = MutableStateFlow<List<AgentConfig>>(emptyList())
@@ -94,6 +116,8 @@ class SettingsViewModel @Inject constructor(
         _currentChannel.value = channel
         val dsKey = securePrefs.getString(Constants.KEY_DEEPSEEK_API_KEY, "") ?: ""
         _deepseekApiKey.value = dsKey
+        val dsModel = securePrefs.getString(Constants.KEY_DEEPSEEK_MODEL, "deepseek-v4-flash") ?: "deepseek-v4-flash"
+        _deepseekModel.value = dsModel
     }
 
     fun switchChannel(channel: String) {
@@ -124,6 +148,42 @@ class SettingsViewModel @Inject constructor(
         _toastMessage.value = if (key.isNotBlank()) "✅ DeepSeek API Key 已保存" else "✅ 已清除 DeepSeek API Key"
     }
 
+    fun saveDeepseekModel(model: String) {
+        securePrefs.edit().putString(Constants.KEY_DEEPSEEK_MODEL, model).apply()
+        _deepseekModel.value = model
+        _toastMessage.value = "✅ 已切换模型: $model"
+    }
+
+    fun queryDeepseekBalance() {
+        val apiKey = _deepseekApiKey.value
+        if (apiKey.isBlank()) {
+            _toastMessage.value = "请先配置 DeepSeek API Key"
+            return
+        }
+        _isLoadingBalance.value = true
+        viewModelScope.launch {
+            try {
+                val url = java.net.URL("https://api.deepseek.com/user/balance")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("Authorization", "Bearer $apiKey")
+                conn.setRequestProperty("Accept", "application/json")
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+                val response = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                val json = com.google.gson.JsonParser.parseString(response).asJsonObject
+                val balance = json.get("balance")?.asString
+                val toppedUp = json.get("topped_up_balance")?.asString
+                _deepseekBalance.value = if (balance != null) "¥$balance" else "查询失败"
+            } catch (e: Exception) {
+                _deepseekBalance.value = "查询失败: ${e.message}"
+            } finally {
+                _isLoadingBalance.value = false
+            }
+        }
+    }
+
     private fun loadConfig() {
         val savedPat = securePrefs.getString(Constants.KEY_COZE_PAT, "") ?: ""
         if (savedPat.isNotBlank()) {
@@ -146,10 +206,28 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadTokenUsage() {
-        _totalTokens.value = securePrefs.getInt("total_tokens_consumed", 0)
-        _totalInputTokens.value = securePrefs.getInt("total_input_tokens", 0)
-        _totalOutputTokens.value = securePrefs.getInt("total_output_tokens", 0)
-        _totalMessages.value = securePrefs.getInt("total_ai_messages", 0)
+        // Coze 通道
+        val cozeTotal = securePrefs.getInt("coze_total_tokens", 0)
+        val cozeInput = securePrefs.getInt("coze_total_input", 0)
+        val cozeOutput = securePrefs.getInt("coze_total_output", 0)
+        val cozeMsgs = securePrefs.getInt("coze_total_messages", 0)
+        _cozeTokens.value = cozeTotal
+        _cozeInputTokens.value = cozeInput
+        _cozeOutputTokens.value = cozeOutput
+        _cozeMessages.value = cozeMsgs
+
+        // DeepSeek 通道
+        val dsTotal = securePrefs.getInt("ds_total_tokens", 0)
+        val dsInput = securePrefs.getInt("ds_total_input", 0)
+        val dsOutput = securePrefs.getInt("ds_total_output", 0)
+        val dsMsgs = securePrefs.getInt("ds_total_messages", 0)
+        _dsTokens.value = dsTotal
+        _dsInputTokens.value = dsInput
+        _dsOutputTokens.value = dsOutput
+        _dsMessages.value = dsMsgs
+
+        // 合计
+        _totalTokens.value = cozeTotal + dsTotal
     }
 
     fun refreshTokenUsage() {
