@@ -298,7 +298,9 @@ fun AssistantScreen(
                     currentChannel = currentChannel,
                     onInputChange = { viewModel.setInputText(it) },
                     onSend = { viewModel.sendMessage() },
-                    onPickImage = { imagePickerLauncher.launch("image/*") }
+                    onPickImage = { imagePickerLauncher.launch("image/*") },
+                    channelLabel = viewModel.getChannelLabel(),
+                    onCycleChannel = { viewModel.cycleChannel() }
                 )
             }
         }
@@ -437,7 +439,9 @@ private fun ChatInputBar(
     currentChannel: String,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
-    onPickImage: () -> Unit
+    onPickImage: () -> Unit,
+    channelLabel: String,
+    onCycleChannel: () -> Unit
 ) {
     val colors = LocalAppColors.current
     val canSend = (inputText.isNotBlank() || pendingImageUri != null) && !isLoading && isChannelReady
@@ -538,12 +542,11 @@ private fun ChatInputBar(
                                     )
                                 }
 
-                                val channelLabel = viewModel.getChannelLabel()
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(colors.surface.copy(alpha = 0.6f))
-                                        .clickable { viewModel.cycleChannel() }
+                                        .clickable { onCycleChannel() }
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(channelLabel, fontSize = 10.sp, color = colors.textTertiary)
