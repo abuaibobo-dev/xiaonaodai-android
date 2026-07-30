@@ -45,30 +45,32 @@ class SettingsViewModel @Inject constructor(
     private val _isUsingDefaultBotId = MutableStateFlow(true)
     val isUsingDefaultBotId: StateFlow<Boolean> = _isUsingDefaultBotId.asStateFlow()
 
-    // ============ Token 消耗统计（分通道） ============
-    // Coze 通道
-    private val _cozeTokens = MutableStateFlow(0)
-    val cozeTokens: StateFlow<Int> = _cozeTokens.asStateFlow()
-    private val _cozeInputTokens = MutableStateFlow(0)
-    val cozeInputTokens: StateFlow<Int> = _cozeInputTokens.asStateFlow()
-    private val _cozeOutputTokens = MutableStateFlow(0)
-    val cozeOutputTokens: StateFlow<Int> = _cozeOutputTokens.asStateFlow()
-    private val _cozeMessages = MutableStateFlow(0)
-    val cozeMessages: StateFlow<Int> = _cozeMessages.asStateFlow()
+    // ============ Token 消耗统计（动态 Map） ============
+    data class ChannelTokenStats(
+        val total: Int = 0,
+        val input: Int = 0,
+        val output: Int = 0,
+        val messages: Int = 0
+    )
 
-    // DeepSeek 通道
-    private val _dsTokens = MutableStateFlow(0)
-    val dsTokens: StateFlow<Int> = _dsTokens.asStateFlow()
-    private val _dsInputTokens = MutableStateFlow(0)
-    val dsInputTokens: StateFlow<Int> = _dsInputTokens.asStateFlow()
-    private val _dsOutputTokens = MutableStateFlow(0)
-    val dsOutputTokens: StateFlow<Int> = _dsOutputTokens.asStateFlow()
-    private val _dsMessages = MutableStateFlow(0)
-    val dsMessages: StateFlow<Int> = _dsMessages.asStateFlow()
+    private val _channelTokenStats = MutableStateFlow<Map<String, ChannelTokenStats>>(emptyMap())
+    val channelTokenStats: StateFlow<Map<String, ChannelTokenStats>> = _channelTokenStats.asStateFlow()
 
-    // 合计
     private val _totalTokens = MutableStateFlow(0)
     val totalTokens: StateFlow<Int> = _totalTokens.asStateFlow()
+
+    /** 获取通道的显示名称 */
+    fun getChannelDisplayName(channelKey: String): String {
+        return when (channelKey) {
+            "coze" -> "🧠 Coze"
+            "deepseek" -> "🔍 DeepSeek"
+            else -> {
+                val id = channelKey.removePrefix("custom:")
+                _customApiList.value.find { it.id == id }?.let { "${it.emoji} ${it.name}" }
+                    ?: channelKey
+            }
+        }
+    }
 
     // ============ AI 通道 ============
     private val _currentChannel = MutableStateFlow(Constants.CHANNEL_COZE)
@@ -86,6 +88,53 @@ class SettingsViewModel @Inject constructor(
     val deepseekBalance: StateFlow<String?> = _deepseekBalance.asStateFlow()
     private val _isLoadingBalance = MutableStateFlow(false)
     val isLoadingBalance: StateFlow<Boolean> = _isLoadingBalance.asStateFlow()
+
+    // ============ 自定义 API 通道 ============
+    private val _customApiList = MutableStateFlow<List<CustomApiConfig>>(emptyList())
+    val customApiList: StateFlow<List<CustomApiConfig>> = _customApiList.asStateFlow()
+
+    private fun loadCustomApiList() {
+        val json = securePrefs.getString(Constants.KEY_CUSTOM_API_LIST, "[]") ?: "[]"
+        val type = object : TypeToken<List<CustomApiConfig>>() {}.type
+        _customApiList.value = try { gson.fromJson(json, type) } catch (_: Exception) { emptyList() }
+    }
+
+    private fun saveCustomApiList(list: List<CustomApiConfig>) {
+        securePrefs.edit().putString(Constants.KEY_CUSTOM_API_LIST, gson.toJson(list)).apply()
+        _customApiList.value = list
+    }
+
+    fun addCustomApi(config: CustomApiConfig) {
+        val list = _customApiList.value.toMutableList()
+        list.add(config)
+        saveCustomApiList(list)
+        _toastMessage.value = "✅ 已添加自定义 API「${config.name}」"
+    }
+
+    fun updateCustomApi(config: CustomApiConfig) {
+        val list = _customApiList.value.toMutableList()
+        val idx = list.indexOfFirst { it.id == config.id }
+        if (idx >= 0) {
+            list[idx] = config
+            saveCustomApiList(list)
+            _toastMessage.value = "✅ 已更新「${config.name}」"
+        }
+    }
+
+    fun deleteCustomApi(id: String) {
+        val list = _customApiList.value.toMutableList()
+        list.removeAll { it.id == id }
+        saveCustomApiList(list)
+        val channel = _currentChannel.value
+        if (channel == "${Constants.CHANNEL_CUSTOM_PREFIX}$id") {
+            switchChannel(Constants.CHANNEL_COZE)
+        }
+        _toastMessage.value = "✅ 已删除"
+    }
+
+    fun getCustomApiById(id: String): CustomApiConfig? {
+        return _customApiList.value.find { it.id == id }
+    }
 
     // ============ Agent 管理 ============
     private val _agentList = MutableStateFlow<List<AgentConfig>>(emptyList())
@@ -111,6 +160,7 @@ class SettingsViewModel @Inject constructor(
         loadTokenUsage()
         loadAgents()
         loadChannelAndDeepseek()
+        loadCustomApiList()
     }
 
     private fun loadChannelAndDeepseek() {
@@ -125,23 +175,33 @@ class SettingsViewModel @Inject constructor(
     fun switchChannel(channel: String) {
         securePrefs.edit().putString(Constants.KEY_AI_CHANNEL, channel).apply()
         _currentChannel.value = channel
-        cozeClient.currentBotId = if (channel == Constants.CHANNEL_DEEPSEEK) {
-            "" // DeepSeek 模式不需要 botId
+
+        val isCustom = channel.startsWith(Constants.CHANNEL_CUSTOM_PREFIX)
+        if (isCustom) {
+            cozeClient.currentBotId = ""
+            val customId = channel.removePrefix(Constants.CHANNEL_CUSTOM_PREFIX)
+            val config = getCustomApiById(customId)
+            _toastMessage.value = "✅ 已切换到「${config?.name ?: "自定义"}」"
         } else {
-            // 恢复 Coze botId
-            val savedBotId = securePrefs.getString("current_agent_id", "") ?: ""
-            if (savedBotId.isNotBlank()) savedBotId
-            else {
-                // 从 settingsRepo 异步读取
-                viewModelScope.launch {
-                    val botId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
-                    cozeClient.currentBotId = botId.ifBlank { Constants.DEFAULT_COZE_BOT_ID }
-                    _cozeBotId.value = cozeClient.currentBotId
+            cozeClient.currentBotId = if (channel == Constants.CHANNEL_DEEPSEEK) {
+                ""
+            } else {
+                val savedBotId = securePrefs.getString("current_agent_id", "") ?: ""
+                if (savedBotId.isNotBlank()) savedBotId
+                else {
+                    viewModelScope.launch {
+                        val botId = settingsRepo.getString(Constants.KEY_COZE_BOT_ID, "")
+                        cozeClient.currentBotId = botId.ifBlank { Constants.DEFAULT_COZE_BOT_ID }
+                        _cozeBotId.value = cozeClient.currentBotId
+                    }
+                    _cozeBotId.value
                 }
-                _cozeBotId.value
+            }
+            _toastMessage.value = when (channel) {
+                Constants.CHANNEL_DEEPSEEK -> "✅ 已切换到 DeepSeek"
+                else -> "✅ 已切换到 Coze"
             }
         }
-        _toastMessage.value = if (channel == Constants.CHANNEL_DEEPSEEK) "✅ 已切换到 DeepSeek" else "✅ 已切换到 Coze"
     }
 
     fun saveDeepseekApiKey(key: String) {
@@ -176,8 +236,9 @@ class SettingsViewModel @Inject constructor(
                     val response = conn.inputStream.bufferedReader().readText()
                     conn.disconnect()
                     val json = com.google.gson.JsonParser.parseString(response).asJsonObject
-                    val balance = json.get("balance")?.asString
-                    if (balance != null) "¥$balance" else "查询失败"
+                    val balanceInfos = json.getAsJsonArray("balance_infos")
+                    val totalBalance = balanceInfos?.firstOrNull()?.asJsonObject?.get("total_balance")?.asString
+                    if (totalBalance != null) "¥$totalBalance" else "查询失败"
                 }
                 _deepseekBalance.value = result
             } catch (e: Exception) {
@@ -210,28 +271,46 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadTokenUsage() {
-        // Coze 通道
+        val map = mutableMapOf<String, ChannelTokenStats>()
+        var grandTotal = 0
+
+        // 内置通道：Coze
         val cozeTotal = securePrefs.getInt("coze_total_tokens", 0)
-        val cozeInput = securePrefs.getInt("coze_total_input", 0)
-        val cozeOutput = securePrefs.getInt("coze_total_output", 0)
-        val cozeMsgs = securePrefs.getInt("coze_total_messages", 0)
-        _cozeTokens.value = cozeTotal
-        _cozeInputTokens.value = cozeInput
-        _cozeOutputTokens.value = cozeOutput
-        _cozeMessages.value = cozeMsgs
+        map["coze"] = ChannelTokenStats(
+            total = cozeTotal,
+            input = securePrefs.getInt("coze_total_input", 0),
+            output = securePrefs.getInt("coze_total_output", 0),
+            messages = securePrefs.getInt("coze_total_messages", 0)
+        )
+        grandTotal += cozeTotal
 
-        // DeepSeek 通道
+        // 内置通道：DeepSeek
         val dsTotal = securePrefs.getInt("ds_total_tokens", 0)
-        val dsInput = securePrefs.getInt("ds_total_input", 0)
-        val dsOutput = securePrefs.getInt("ds_total_output", 0)
-        val dsMsgs = securePrefs.getInt("ds_total_messages", 0)
-        _dsTokens.value = dsTotal
-        _dsInputTokens.value = dsInput
-        _dsOutputTokens.value = dsOutput
-        _dsMessages.value = dsMsgs
+        map["deepseek"] = ChannelTokenStats(
+            total = dsTotal,
+            input = securePrefs.getInt("ds_total_input", 0),
+            output = securePrefs.getInt("ds_total_output", 0),
+            messages = securePrefs.getInt("ds_total_messages", 0)
+        )
+        grandTotal += dsTotal
 
-        // 合计
-        _totalTokens.value = cozeTotal + dsTotal
+        // 自定义 API 通道
+        _customApiList.value.forEach { config ->
+            val prefix = "custom:${config.id}"
+            val total = securePrefs.getInt("${prefix}_total_tokens", 0)
+            if (total > 0 || securePrefs.contains("${prefix}_total_tokens")) {
+                map[prefix] = ChannelTokenStats(
+                    total = total,
+                    input = securePrefs.getInt("${prefix}_total_input", 0),
+                    output = securePrefs.getInt("${prefix}_total_output", 0),
+                    messages = securePrefs.getInt("${prefix}_total_messages", 0)
+                )
+                grandTotal += total
+            }
+        }
+
+        _channelTokenStats.value = map
+        _totalTokens.value = grandTotal
     }
 
     fun refreshTokenUsage() {
