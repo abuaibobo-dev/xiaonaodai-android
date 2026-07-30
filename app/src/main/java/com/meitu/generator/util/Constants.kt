@@ -13,7 +13,8 @@ object Constants {
     // ============ DeepSeek API 配置 ============
     const val DEEPSEEK_API_BASE_URL = "https://api.deepseek.com"
     const val KEY_DEEPSEEK_API_KEY = "deepseek_api_key"
-    const val DEEPSEEK_MODEL = "deepseek-chat"
+    const val KEY_DEEPSEEK_MODEL = "deepseek_model"
+    val DEEPSEEK_MODELS = listOf("deepseek-v4-flash", "deepseek-v4-pro")
 
     // ============ AI 通道类型 ============
     const val CHANNEL_COZE = "coze"
@@ -25,6 +26,6 @@ object Constants {
 
     // ============ App 信息 ============
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "6.1.0"
-    const val APP_VERSION_CODE = 61
+    const val APP_VERSION = "6.2.0"
+    const val APP_VERSION_CODE = 62
 }
