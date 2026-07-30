@@ -25,9 +25,10 @@ import java.util.concurrent.TimeUnit
 class CozeApiClient(
     private val baseUrl: String,
     private val pat: String,
-    private val botId: String,
+    botId: String,
     private val httpClient: OkHttpClient
 ) {
+    var currentBotId: String = botId
     companion object {
         private const val TAG = "CozeApiClient"
         private const val API_BASE = "https://api.coze.cn"
@@ -42,7 +43,7 @@ class CozeApiClient(
         userId: String = "default_user"
     ): Flow<StreamEvent> = flow {
         val requestBody = JsonObject().apply {
-            addProperty("bot_id", botId)
+            addProperty("bot_id", currentBotId)
             addProperty("user_id", userId)
             addProperty("stream", true)
             addProperty("auto_save_history", true)
@@ -66,7 +67,7 @@ class CozeApiClient(
             .post(requestBody.toString().toRequestBody(JSON_MEDIA))
             .build()
 
-        Log.d(TAG, "Creating chat with bot: $botId")
+        Log.d(TAG, "Creating chat with bot: $currentBotId")
 
         val response = withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute()
@@ -174,7 +175,7 @@ class CozeApiClient(
         userId: String = "default_user"
     ): CozeChatResult = withContext(Dispatchers.IO) {
         val requestBody = JsonObject().apply {
-            addProperty("bot_id", botId)
+            addProperty("bot_id", currentBotId)
             addProperty("user_id", userId)
             addProperty("stream", false)
             addProperty("auto_save_history", true)
@@ -257,6 +258,193 @@ class CozeApiClient(
         val answer = assistantMessage?.get("content")?.asString ?: "未获取到回复"
         CozeChatResult.Success(answer, chatId, convId)
     }
+
+    // ============ Bot 创建与发布 ============
+
+    suspend fun createBot(name: String, systemPrompt: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = JsonObject().apply {
+                addProperty("space_id", "")  // 使用默认个人空间
+                addProperty("name", name)
+                addProperty("description", "由布老师App创建的AI助手")
+                addProperty("prompt_info", systemPrompt)
+            }
+            val url = "${API_BASE}/v1/bot/create"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer $pat")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody.toString().toRequestBody(JSON_MEDIA))
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("创建Bot失败: ${response.code} - $body"))
+            }
+            val json = JsonParser.parseString(body).asJsonObject
+            val botId = json.getAsJsonObject("data")?.get("bot_id")?.asString
+            if (botId != null) Result.success(botId)
+            else Result.failure(Exception("创建Bot失败: 未获取到bot_id"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun publishBot(botId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = JsonObject().apply {
+                addProperty("bot_id", botId)
+                val connectorIds = com.google.gson.JsonArray()
+                connectorIds.add("1024") // API 渠道
+                add("connector_ids", connectorIds)
+            }
+            val url = "${API_BASE}/v1/bot/publish"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer $pat")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody.toString().toRequestBody(JSON_MEDIA))
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            val body = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("发布Bot失败: ${response.code} - $body"))
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ============ DeepSeek 直连流式对话 ============
+
+    /**
+     * DeepSeek 直连流式对话（OpenAI 兼容格式），消耗 DeepSeek 账户余额
+     */
+    fun streamDeepSeekChat(
+        apiKey: String,
+        message: String,
+        systemPrompt: String? = null,
+        history: List<Pair<String, String>> = emptyList()
+    ): Flow<StreamEvent> = flow {
+        val messages = com.google.gson.JsonArray()
+
+        // 系统提示词
+        if (!systemPrompt.isNullOrBlank()) {
+            messages.add(JsonObject().apply {
+                addProperty("role", "system")
+                addProperty("content", systemPrompt)
+            })
+        }
+
+        // 历史对话（最近5轮）
+        val recentHistory = if (history.size > 10) history.takeLast(10) else history
+        for ((role, content) in recentHistory) {
+            messages.add(JsonObject().apply {
+                addProperty("role", role)
+                addProperty("content", content)
+            })
+        }
+
+        // 当前用户消息
+        messages.add(JsonObject().apply {
+            addProperty("role", "user")
+            addProperty("content", message)
+        })
+
+        val requestBody = JsonObject().apply {
+            addProperty("model", "deepseek-chat")
+            add("messages", messages)
+            addProperty("stream", true)
+        }
+
+        val url = "https://api.deepseek.com/v1/chat/completions"
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody(JSON_MEDIA))
+            .build()
+
+        Log.d(TAG, "DeepSeek streaming chat request")
+
+        val response = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute()
+        }
+
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: "Unknown error"
+            Log.e(TAG, "DeepSeek API error: ${response.code} - $errorBody")
+            emit(StreamEvent.Error("DeepSeek 请求失败 (${response.code}): $errorBody"))
+            return@flow
+        }
+
+        val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
+        var fullText = StringBuilder()
+        var totalTokens = 0
+        var hasEmittedDone = false
+
+        try {
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                val l = line ?: continue
+                if (!l.startsWith("data:")) continue
+                val dataStr = l.removePrefix("data:").trim()
+                if (dataStr.isEmpty() || dataStr == "[DONE]") {
+                    if (dataStr == "[DONE]") {
+                        if (!hasEmittedDone && fullText.isNotEmpty()) {
+                            emit(StreamEvent.Done(fullText.toString(), "", ""))
+                            hasEmittedDone = true
+                        }
+                    }
+                    continue
+                }
+
+                try {
+                    val json = JsonParser.parseString(dataStr).asJsonObject
+                    val choices = json.getAsJsonArray("choices")
+                    if (choices != null && choices.size() > 0) {
+                        val choice = choices[0].asJsonObject
+                        val delta = choice.getAsJsonObject("delta")
+                        val content = delta?.get("content")?.asString ?: ""
+                        if (content.isNotEmpty()) {
+                            fullText.append(content)
+                            emit(StreamEvent.Delta(content))
+                        }
+                    }
+
+                    // 尝试从 usage 字段提取 token 消耗
+                    val usage = json.getAsJsonObject("usage")
+                    if (usage != null) {
+                        totalTokens = usage.get("total_tokens")?.asInt ?: 0
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Parse DeepSeek SSE error: ${e.message}")
+                }
+            }
+        } finally {
+            reader.close()
+            response.close()
+        }
+
+        if (!hasEmittedDone) {
+            if (fullText.isNotEmpty()) {
+                emit(StreamEvent.Done(fullText.toString(), "", ""))
+            } else {
+                emit(StreamEvent.Error("DeepSeek 未返回内容，请检查 API Key 或余额"))
+            }
+        }
+
+        // 发送 token 消耗（DeepSeek 流式可能不返回 usage，此时估算）
+        if (totalTokens == 0 && fullText.isNotEmpty()) {
+            totalTokens = fullText.length // 粗略估算
+        }
+        if (totalTokens > 0) {
+            emit(StreamEvent.TokenUsage(totalTokens, totalTokens / 2, totalTokens / 2))
+        }
+    }.flowOn(Dispatchers.IO)
 }
 
 sealed class StreamEvent {
