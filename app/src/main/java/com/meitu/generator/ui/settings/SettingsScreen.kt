@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.meitu.generator.ui.theme.*
 import com.meitu.generator.ui.components.Spacing
 import com.meitu.generator.ui.components.CornerRadius
+import com.meitu.generator.util.Constants
 
 @Composable
 fun SettingsScreen(
