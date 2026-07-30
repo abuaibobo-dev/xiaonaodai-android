@@ -214,18 +214,20 @@ private fun TopAppBar(
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                 )
 
-                // 右侧：新建对话按钮
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onNewChat,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Add,
-                            contentDescription = "新建对话",
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(22.dp)
-                        )
+                // 右侧：新建对话按钮（设置页不显示）
+                if (currentRoute != Routes.SETTINGS) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onNewChat,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "新建对话",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -388,15 +390,7 @@ private fun SidebarDrawer(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(colors.surface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("\uD83E\uDDE0", fontSize = 16.sp)
-                }
+                Text("\uD83E\uDDE0", fontSize = 36.sp)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
