@@ -5,13 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,31 +35,21 @@ fun SettingsScreen(
     val cozeBotId by viewModel.cozeBotId.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val totalTokens by viewModel.totalTokens.collectAsState()
-    val cozeTokens by viewModel.cozeTokens.collectAsState()
-    val cozeInputTokens by viewModel.cozeInputTokens.collectAsState()
-    val cozeOutputTokens by viewModel.cozeOutputTokens.collectAsState()
-    val cozeMessages by viewModel.cozeMessages.collectAsState()
-    val dsTokens by viewModel.dsTokens.collectAsState()
-    val dsInputTokens by viewModel.dsInputTokens.collectAsState()
-    val dsOutputTokens by viewModel.dsOutputTokens.collectAsState()
-    val dsMessages by viewModel.dsMessages.collectAsState()
-    val agentList by viewModel.agentList.collectAsState()
-    val currentAgentId by viewModel.currentAgentId.collectAsState()
-    val isCreatingAgent by viewModel.isCreatingAgent.collectAsState()
-    val currentChannel by viewModel.currentChannel.collectAsState()
+    val channelTokenStats by viewModel.channelTokenStats.collectAsState()
     val deepseekApiKey by viewModel.deepseekApiKey.collectAsState()
     val deepseekModel by viewModel.deepseekModel.collectAsState()
     val deepseekBalance by viewModel.deepseekBalance.collectAsState()
     val isLoadingBalance by viewModel.isLoadingBalance.collectAsState()
+    val customApiList by viewModel.customApiList.collectAsState()
 
     var showPatDialog by remember { mutableStateOf(false) }
     var showBotIdDialog by remember { mutableStateOf(false) }
-    var showCreateAgentDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf<AgentConfig?>(null) }
     var showDeepseekDialog by remember { mutableStateOf(false) }
     var patInput by remember { mutableStateOf("") }
     var botIdInput by remember { mutableStateOf("") }
     var deepseekKeyInput by remember { mutableStateOf("") }
+    var showCustomApiDialog by remember { mutableStateOf(false) }
+    var editingCustomApi by remember { mutableStateOf<CustomApiConfig?>(null) }
 
     LaunchedEffect(toastMessage) {
         if (toastMessage != null) {
@@ -83,8 +69,8 @@ fun SettingsScreen(
             contentPadding = PaddingValues(horizontal = Spacing.PagePadding, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(Spacing.ElementSpacing)
         ) {
-            // ============ 我的 Agent ============
-            item { SectionTitle("我的 Agent") }
+            // ============ 自定义 API 配置 ============
+            item { SectionTitle("自定义 API") }
             item {
                 Column(
                     modifier = Modifier
@@ -93,169 +79,43 @@ fun SettingsScreen(
                         .background(colors.surface)
                         .padding(Spacing.CardSpacing)
                 ) {
-                    // 当前 Agent 指示
-                    val currentAgent = agentList.find { it.botId == currentAgentId }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("当前 Agent", fontSize = 13.sp, color = colors.textTertiary)
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                currentAgent?.let { "${it.emoji} ${it.name}" } ?: "🧠 布老师（默认）",
-                                fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary
-                            )
-                        }
-                    }
-
-                    // Agent 列表
-                    if (agentList.isNotEmpty()) {
-                        Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp).height(0.5.dp).background(colors.border))
-
-                        agentList.forEachIndexed { index, agent ->
-                            val isActive = agent.botId == currentAgentId
+                    if (customApiList.isEmpty()) {
+                        Text("暂无自定义 API", fontSize = 13.sp, color = colors.textTertiary)
+                    } else {
+                        customApiList.forEachIndexed { index, config ->
+                            if (index > 0) Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(0.5.dp).background(colors.border))
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isActive) colors.accent.copy(alpha = 0.1f) else Color.Transparent)
-                                    .clickable { if (!isActive) viewModel.switchAgent(agent) }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    // Emoji 头像
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(colors.accent.copy(alpha = 0.15f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(agent.emoji, fontSize = 16.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("${config.emoji} ${config.name}", fontSize = 15.sp, color = colors.textPrimary)
+                                    Text(config.baseUrl, fontSize = 11.sp, color = colors.textTertiary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                }
+                                Row {
+                                    IconButton(onClick = { editingCustomApi = config; showCustomApiDialog = true }, modifier = Modifier.size(32.dp)) {
+                                        Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
                                     }
-                                    Spacer(Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            agent.name,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = colors.textPrimary
-                                        )
-                                        Text(
-                                            if (isActive) "使用中" else "点击切换",
-                                            fontSize = 11.sp,
-                                            color = if (isActive) colors.accent else colors.textTertiary
-                                        )
+                                    IconButton(onClick = { viewModel.deleteCustomApi(config.id) }, modifier = Modifier.size(32.dp)) {
+                                        Text("✕", fontSize = 14.sp, color = colors.error ?: colors.textTertiary)
                                     }
                                 }
-                                // 删除按钮
-                                IconButton(
-                                    onClick = { showDeleteConfirm = agent },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "删除",
-                                        tint = colors.error.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                            if (index < agentList.lastIndex) {
-                                Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).height(0.5.dp).background(colors.border.copy(alpha = 0.5f)))
                             }
                         }
                     }
-
-                    // 新建 Agent 按钮
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp).height(0.5.dp).background(colors.border))
+                    Spacer(Modifier.height(8.dp))
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                    Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { showCreateAgentDialog = true }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "新建", tint = colors.accent, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("新建 Agent", fontSize = 14.sp, color = colors.accent, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-
-            // ============ AI 通道切换 ============
-            item { SectionTitle("AI 通道") }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(CornerRadius.Card))
-                        .background(colors.surface)
-                        .padding(Spacing.CardSpacing)
-                ) {
-                    // Coze 通道
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (currentChannel == "coze") colors.accent.copy(alpha = 0.1f) else Color.Transparent)
-                            .clickable { viewModel.switchChannel("coze") }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .clickable { editingCustomApi = null; showCustomApiDialog = true }
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Box(
-                                modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.accent.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) { Text("🧠", fontSize = 14.sp) }
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text("Coze Bot", fontSize = 14.sp, fontWeight = if (currentChannel == "coze") FontWeight.SemiBold else FontWeight.Normal, color = colors.textPrimary)
-                                Text("走 Coze 平台，消耗 Coze 积分", fontSize = 11.sp, color = colors.textTertiary)
-                            }
-                        }
-                        if (currentChannel == "coze") {
-                            Text("✓", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.accent)
-                        }
-                    }
-
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp).height(0.5.dp).background(colors.border.copy(alpha = 0.5f)))
-
-                    // DeepSeek 通道
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (currentChannel == "deepseek") colors.accent.copy(alpha = 0.1f) else Color.Transparent)
-                            .clickable { viewModel.switchChannel("deepseek") }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Box(
-                                modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.accent.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) { Text("🔍", fontSize = 14.sp) }
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text("DeepSeek", fontSize = 14.sp, fontWeight = if (currentChannel == "deepseek") FontWeight.SemiBold else FontWeight.Normal, color = colors.textPrimary)
-                                Text("直连 DeepSeek API，消耗账户余额", fontSize = 11.sp, color = colors.textTertiary)
-                            }
-                        }
-                        if (currentChannel == "deepseek") {
-                            Text("✓", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.accent)
-                        }
+                        Text("＋ 添加自定义 API", fontSize = 14.sp, color = colors.accent)
                     }
                 }
             }
@@ -389,12 +249,21 @@ fun SettingsScreen(
                                 } else if (deepseekBalance != null) {
                                     Text(deepseekBalance!!, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.success)
                                 }
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(4.dp))
                                 TextButton(
                                     onClick = { viewModel.queryDeepseekBalance() },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
                                     Text("查询", fontSize = 12.sp, color = colors.accent)
+                                }
+                                TextButton(
+                                    onClick = {
+                                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                                        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://platform.deepseek.com/usage")))
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text("直达", fontSize = 12.sp, color = colors.textTertiary)
                                 }
                             }
                         }
@@ -425,59 +294,41 @@ fun SettingsScreen(
                         )
                     }
 
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp).height(0.5.dp).background(colors.border))
+                    // 各通道动态渲染
+                    var isFirst = true
+                    channelTokenStats.forEach { (channelKey, stats) ->
+                        if (isFirst) {
+                            isFirst = false
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp).height(0.5.dp).background(colors.border))
+                        } else {
+                            Spacer(Modifier.height(12.dp))
+                            Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                            Spacer(Modifier.height(12.dp))
+                        }
 
-                    // ===== Coze 通道 =====
-                    Text("Coze 通道", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.accent)
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("总消耗", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(cozeTokens.formatTokenCount(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输入", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(cozeInputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输出", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(cozeOutputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("次数", fontSize = 10.sp, color = colors.textTertiary)
-                            Text("$cozeMessages 次", fontSize = 13.sp, color = colors.textSecondary)
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
-                    Spacer(Modifier.height(12.dp))
-
-                    // ===== DeepSeek 通道 =====
-                    Text("DeepSeek 通道", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.success)
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("总消耗", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(dsTokens.formatTokenCount(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输入", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(dsInputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输出", fontSize = 10.sp, color = colors.textTertiary)
-                            Text(dsOutputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("次数", fontSize = 10.sp, color = colors.textTertiary)
-                            Text("$dsMessages 次", fontSize = 13.sp, color = colors.textSecondary)
+                        val displayName = viewModel.getChannelDisplayName(channelKey)
+                        Text(displayName, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (channelKey == "coze") colors.accent else if (channelKey == "deepseek") colors.success else colors.textPrimary)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("总消耗", fontSize = 10.sp, color = colors.textTertiary)
+                                Text(stats.total.formatTokenCount(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("输入", fontSize = 10.sp, color = colors.textTertiary)
+                                Text(stats.input.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("输出", fontSize = 10.sp, color = colors.textTertiary)
+                                Text(stats.output.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("次数", fontSize = 10.sp, color = colors.textTertiary)
+                                Text("${stats.messages} 次", fontSize = 13.sp, color = colors.textSecondary)
+                            }
                         }
                     }
                 }
@@ -522,139 +373,7 @@ fun SettingsScreen(
             }
         }
 
-        // Loading overlay when creating agent
-        if (isCreatingAgent) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable(enabled = false) {},
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = colors.surface),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(color = colors.accent)
-                        Spacer(Modifier.height(16.dp))
-                        Text("正在创建 Agent...", fontSize = 15.sp, color = colors.textPrimary)
-                    }
-                }
-            }
-        }
-    }
-
-    // ============ 新建 Agent 弹窗 ============
-    if (showCreateAgentDialog) {
-        var agentName by remember { mutableStateOf("") }
-        var agentPrompt by remember { mutableStateOf("") }
-        var agentEmoji by remember { mutableStateOf("🤖") }
-        val emojiOptions = listOf("🤖", "🧠", "🎯", "📚", "🔬", "💡", "🎨", "🌟", "🔥", "💎")
-
-        AlertDialog(
-            onDismissRequest = { showCreateAgentDialog = false },
-            containerColor = colors.surface,
-            title = { Text("新建 Agent", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                Column {
-                    // Emoji 选择
-                    Text("选择头像", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(emojiOptions) { emoji ->
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (emoji == agentEmoji) colors.accent.copy(alpha = 0.2f)
-                                        else colors.surface
-                                    )
-                                    .clickable { agentEmoji = emoji }
-                                    .border(
-                                        width = if (emoji == agentEmoji) 2.dp else 0.dp,
-                                        color = if (emoji == agentEmoji) colors.accent else Color.Transparent,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(emoji, fontSize = 20.sp)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-
-                    // 名称
-                    OutlinedTextField(
-                        value = agentName, onValueChange = { agentName = it },
-                        label = { Text("Agent 名称", color = colors.textTertiary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-
-                    // 提示词
-                    OutlinedTextField(
-                        value = agentPrompt, onValueChange = { agentPrompt = it },
-                        label = { Text("系统提示词", color = colors.textTertiary) },
-                        placeholder = { Text("描述这个 Agent 的角色和能力...", color = colors.textTertiary.copy(alpha = 0.5f)) },
-                        singleLine = false,
-                        minLines = 3,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.createAgent(agentName.trim(), agentPrompt.trim(), agentEmoji)
-                        showCreateAgentDialog = false
-                    },
-                    enabled = agentName.isNotBlank() && agentPrompt.isNotBlank(),
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                ) { Text("创建") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateAgentDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") }
-            }
-        )
-    }
-
-    // ============ 删除确认弹窗 ============
-    showDeleteConfirm?.let { agent ->
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = null },
-            containerColor = colors.surface,
-            title = { Text("删除 Agent", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
-            text = { Text("确定要删除「${agent.name}」吗？删除后无法恢复。", color = colors.textSecondary, fontSize = 14.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteAgent(agent)
-                        showDeleteConfirm = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = colors.error)
-                ) { Text("删除") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = null }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") }
-            }
-        )
+        // Loading overlay removed
     }
 
     // ============ PAT 编辑 弹窗 ============
@@ -738,6 +457,160 @@ fun SettingsScreen(
             confirmButton = { TextButton(onClick = { viewModel.saveCozeBotId(botIdInput.trim()); showBotIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
             dismissButton = { TextButton(onClick = { showBotIdDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
         )
+    }
+
+    // ============ 自定义 API 编辑弹窗 ============
+    if (showCustomApiDialog) {
+        val isEditing = editingCustomApi != null
+        var nameInput by remember { mutableStateOf(editingCustomApi?.name ?: "") }
+        var urlInput by remember { mutableStateOf(editingCustomApi?.baseUrl ?: "") }
+        var keyInput by remember { mutableStateOf(editingCustomApi?.apiKey ?: "") }
+        var modelInput by remember { mutableStateOf(editingCustomApi?.model ?: "") }
+        var emojiInput by remember { mutableStateOf(editingCustomApi?.emoji ?: "🔌") }
+
+        AlertDialog(
+            onDismissRequest = { showCustomApiDialog = false },
+            containerColor = colors.surface,
+            title = { Text(if (isEditing) "编辑自定义 API" else "添加自定义 API", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("支持任何 OpenAI 兼容的 API", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = nameInput, onValueChange = { nameInput = it },
+                        label = { Text("名称", color = colors.textTertiary) },
+                        placeholder = { Text("如：OpenAI / 硅基流动", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = urlInput, onValueChange = { urlInput = it },
+                        label = { Text("API Base URL", color = colors.textTertiary) },
+                        placeholder = { Text("https://api.openai.com/v1", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = keyInput, onValueChange = { keyInput = it },
+                        label = { Text("API Key", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = modelInput, onValueChange = { modelInput = it },
+                        label = { Text("模型", color = colors.textTertiary) },
+                        placeholder = { Text("如：gpt-4o / deepseek-v4-flash", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = emojiInput, onValueChange = { emojiInput = it },
+                        label = { Text("图标 (emoji)", color = colors.textTertiary) },
+                        placeholder = { Text("🔌", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.width(80.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (nameInput.isNotBlank() && urlInput.isNotBlank() && keyInput.isNotBlank() && modelInput.isNotBlank()) {
+                            val config = CustomApiConfig(
+                                id = editingCustomApi?.id ?: java.util.UUID.randomUUID().toString(),
+                                name = nameInput.trim(),
+                                baseUrl = urlInput.trim(),
+                                apiKey = keyInput.trim(),
+                                model = modelInput.trim(),
+                                emoji = emojiInput.trim().ifBlank { "🔌" }
+                            )
+                            if (isEditing) viewModel.updateCustomApi(config) else viewModel.addCustomApi(config)
+                            showCustomApiDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.accent),
+                    enabled = nameInput.isNotBlank() && urlInput.isNotBlank() && keyInput.isNotBlank() && modelInput.isNotBlank()
+                ) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { showCustomApiDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+}
+
+@Composable
+private fun ChannelRow(
+    emoji: String,
+    name: String,
+    desc: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
+) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isActive) colors.accent.copy(alpha = 0.1f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier.size(24.dp).clip(CircleShape).background(colors.accent.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) { Text(emoji, fontSize = 12.sp) }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(name, fontSize = 14.sp, fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal, color = colors.textPrimary)
+                Text(desc, fontSize = 11.sp, color = colors.textTertiary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onEdit != null) {
+                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.textTertiary, modifier = Modifier.size(14.dp))
+                }
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Text("✕", fontSize = 14.sp, color = colors.error ?: colors.textTertiary)
+                }
+            }
+            if (isActive) {
+                Spacer(Modifier.width(4.dp))
+                Text("✓", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.accent)
+            }
+        }
     }
 }
 
