@@ -1,9 +1,11 @@
 package com.meitu.generator.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,14 +38,22 @@ fun SettingsScreen(
     val cozeBotId by viewModel.cozeBotId.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val totalTokens by viewModel.totalTokens.collectAsState()
-    val totalInputTokens by viewModel.totalInputTokens.collectAsState()
-    val totalOutputTokens by viewModel.totalOutputTokens.collectAsState()
-    val totalMessages by viewModel.totalMessages.collectAsState()
+    val cozeTokens by viewModel.cozeTokens.collectAsState()
+    val cozeInputTokens by viewModel.cozeInputTokens.collectAsState()
+    val cozeOutputTokens by viewModel.cozeOutputTokens.collectAsState()
+    val cozeMessages by viewModel.cozeMessages.collectAsState()
+    val dsTokens by viewModel.dsTokens.collectAsState()
+    val dsInputTokens by viewModel.dsInputTokens.collectAsState()
+    val dsOutputTokens by viewModel.dsOutputTokens.collectAsState()
+    val dsMessages by viewModel.dsMessages.collectAsState()
     val agentList by viewModel.agentList.collectAsState()
     val currentAgentId by viewModel.currentAgentId.collectAsState()
     val isCreatingAgent by viewModel.isCreatingAgent.collectAsState()
     val currentChannel by viewModel.currentChannel.collectAsState()
     val deepseekApiKey by viewModel.deepseekApiKey.collectAsState()
+    val deepseekModel by viewModel.deepseekModel.collectAsState()
+    val deepseekBalance by viewModel.deepseekBalance.collectAsState()
+    val isLoadingBalance by viewModel.isLoadingBalance.collectAsState()
 
     var showPatDialog by remember { mutableStateOf(false) }
     var showBotIdDialog by remember { mutableStateOf(false) }
@@ -337,6 +347,57 @@ fun SettingsScreen(
                             Icon(Icons.Default.Edit, contentDescription = "编辑", tint = colors.accent, modifier = Modifier.size(18.dp))
                         }
                     }
+
+                    if (deepseekApiKey.isNotBlank()) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp).height(0.5.dp).background(colors.border))
+
+                        // 模型选择
+                        Text("模型选择", fontSize = 13.sp, color = colors.textTertiary)
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Constants.DEEPSEEK_MODELS.forEach { model ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (model == deepseekModel) colors.accent.copy(alpha = 0.15f) else colors.background)
+                                        .clickable { viewModel.saveDeepseekModel(model) }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        model,
+                                        fontSize = 12.sp,
+                                        color = if (model == deepseekModel) colors.accent else colors.textSecondary,
+                                        fontWeight = if (model == deepseekModel) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                            }
+                        }
+
+                        // 余额查询
+                        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp).height(0.5.dp).background(colors.border))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("账户余额", fontSize = 14.sp, color = colors.textPrimary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isLoadingBalance) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = colors.accent)
+                                } else if (deepseekBalance != null) {
+                                    Text(deepseekBalance!!, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.success)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                TextButton(
+                                    onClick = { viewModel.queryDeepseekBalance() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text("查询", fontSize = 12.sp, color = colors.accent)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -365,25 +426,57 @@ fun SettingsScreen(
 
                     Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp).height(0.5.dp).background(colors.border))
 
-                    // 明细
+                    // ===== Coze 通道 =====
+                    Text("Coze 通道", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.accent)
+                    Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输入", fontSize = 11.sp, color = colors.textTertiary)
-                            Spacer(Modifier.height(2.dp))
-                            Text(totalInputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                            Text("总消耗", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(cozeTokens.formatTokenCount(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("输出", fontSize = 11.sp, color = colors.textTertiary)
-                            Spacer(Modifier.height(2.dp))
-                            Text(totalOutputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                            Text("输入", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(cozeInputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("对话次数", fontSize = 11.sp, color = colors.textTertiary)
-                            Spacer(Modifier.height(2.dp))
-                            Text("$totalMessages 次", fontSize = 13.sp, color = colors.textSecondary)
+                            Text("输出", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(cozeOutputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("次数", fontSize = 10.sp, color = colors.textTertiary)
+                            Text("$cozeMessages 次", fontSize = 13.sp, color = colors.textSecondary)
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+                    Spacer(Modifier.height(12.dp))
+
+                    // ===== DeepSeek 通道 =====
+                    Text("DeepSeek 通道", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.success)
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("总消耗", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(dsTokens.formatTokenCount(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("输入", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(dsInputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("输出", fontSize = 10.sp, color = colors.textTertiary)
+                            Text(dsOutputTokens.formatTokenCount(), fontSize = 13.sp, color = colors.textSecondary)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("次数", fontSize = 10.sp, color = colors.textTertiary)
+                            Text("$dsMessages 次", fontSize = 13.sp, color = colors.textSecondary)
                         }
                     }
                 }
@@ -470,20 +563,28 @@ fun SettingsScreen(
                     // Emoji 选择
                     Text("选择头像", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
-                    Row(
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        emojiOptions.forEach { emoji ->
+                        items(emojiOptions) { emoji ->
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(if (emoji == agentEmoji) colors.accent.copy(alpha = 0.2f) else colors.background)
-                                    .clickable { agentEmoji = emoji },
+                                    .background(
+                                        if (emoji == agentEmoji) colors.accent.copy(alpha = 0.2f)
+                                        else colors.surface
+                                    )
+                                    .clickable { agentEmoji = emoji }
+                                    .border(
+                                        width = if (emoji == agentEmoji) 2.dp else 0.dp,
+                                        color = if (emoji == agentEmoji) colors.accent else Color.Transparent,
+                                        shape = CircleShape
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(emoji, fontSize = 18.sp)
+                                Text(emoji, fontSize = 20.sp)
                             }
                         }
                     }
