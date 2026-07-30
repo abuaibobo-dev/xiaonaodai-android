@@ -222,7 +222,7 @@ private fun TopAppBar(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                Icons.Outlined.Add,
+                                Icons.Default.Create,
                                 contentDescription = "新建对话",
                                 tint = colors.textSecondary,
                                 modifier = Modifier.size(22.dp)
