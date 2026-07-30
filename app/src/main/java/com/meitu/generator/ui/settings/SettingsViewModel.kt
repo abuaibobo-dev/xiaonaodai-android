@@ -622,7 +622,7 @@ class SettingsViewModel @Inject constructor(
                             conn.disconnect()
                             lastError = "HTTP $code"
                         } catch (_: Exception) {
-                            lastError = "${_->message}"
+                            lastError = "未知错误"
                         }
                     }
                     "❌ $lastError"
