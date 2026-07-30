@@ -13,8 +13,8 @@ android {
         applicationId = "com.meitu.generator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 60
-        versionName = "6.0.0"
+        versionCode = 61
+        versionName = "6.1.0"
         multiDexEnabled = true
     }
 
@@ -38,6 +38,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    ksp {
+        arg("ksp.incremental", "false")
     }
 
     buildFeatures {
