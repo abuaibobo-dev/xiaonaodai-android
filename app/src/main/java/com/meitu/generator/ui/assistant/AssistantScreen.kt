@@ -308,19 +308,7 @@ private fun EmptyState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(
-                            colors = listOf(colors.accent, colors.accent.copy(alpha = 0.7f))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("🧠", fontSize = 28.sp)
-            }
+            Text("🧠", fontSize = 48.sp)
 
             Spacer(Modifier.height(8.dp))
 
