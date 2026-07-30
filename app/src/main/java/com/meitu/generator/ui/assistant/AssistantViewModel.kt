@@ -10,7 +10,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meitu.generator.data.remote.CozeApiClient
 import com.meitu.generator.data.remote.StreamEvent
-import com.meitu.generator.data.remote.TokenUsage
 import com.meitu.generator.data.local.dao.ChatMessageDao
 import com.meitu.generator.data.local.dao.SessionSummary
 import com.meitu.generator.data.local.entity.ChatMessageEntity
