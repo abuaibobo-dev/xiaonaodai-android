@@ -107,8 +107,9 @@ class CozeApiClient(
                         }
                         "conversation.chat.in_progress" -> {}
                         "conversation.message.delta" -> {
-                            val content = json.get("content")?.asString ?: ""
-                            val reasoning = json.get("reasoning_content")?.asString ?: ""
+                            val msg = json.getAsJsonObject("message")
+                            val content = msg?.get("content")?.asString ?: ""
+                            val reasoning = msg?.get("reasoning_content")?.asString ?: json.get("reasoning_content")?.asString ?: ""
                             if (content.isNotEmpty()) {
                                 fullText.append(content)
                                 emit(StreamEvent.Delta(content))
@@ -117,8 +118,9 @@ class CozeApiClient(
                             }
                         }
                         "conversation.message.completed" -> {
-                            val type = json.get("type")?.asString ?: ""
-                            val content = json.get("content")?.asString ?: ""
+                            val msg = json.getAsJsonObject("message")
+                            val type = msg?.get("type")?.asString ?: json.get("type")?.asString ?: ""
+                            val content = msg?.get("content")?.asString ?: json.get("content")?.asString ?: ""
                             if (type == "answer" && content.isNotEmpty() && fullText.isEmpty()) {
                                 fullText.append(content)
                                 Log.d(TAG, "Recovered full text from completed event")
@@ -441,6 +443,128 @@ class CozeApiClient(
         // 发送 token 消耗（DeepSeek 流式可能不返回 usage，此时估算）
         if (totalTokens == 0 && fullText.isNotEmpty()) {
             totalTokens = fullText.length // 粗略估算
+        }
+        if (totalTokens > 0) {
+            emit(StreamEvent.TokenUsage(totalTokens, totalTokens / 2, totalTokens / 2))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * 通用 OpenAI 兼容 API 流式对话
+     */
+    fun streamCustomChat(
+        apiKey: String,
+        message: String,
+        baseUrl: String,
+        model: String,
+        systemPrompt: String? = null,
+        history: List<Pair<String, String>> = emptyList()
+    ): Flow<StreamEvent> = flow {
+        val messages = com.google.gson.JsonArray()
+
+        if (!systemPrompt.isNullOrBlank()) {
+            messages.add(com.google.gson.JsonObject().apply {
+                addProperty("role", "system")
+                addProperty("content", systemPrompt)
+            })
+        }
+
+        val recentHistory = if (history.size > 10) history.takeLast(10) else history
+        for ((role, content) in recentHistory) {
+            messages.add(com.google.gson.JsonObject().apply {
+                addProperty("role", role)
+                addProperty("content", content)
+            })
+        }
+
+        messages.add(com.google.gson.JsonObject().apply {
+            addProperty("role", "user")
+            addProperty("content", message)
+        })
+
+        val requestBody = com.google.gson.JsonObject().apply {
+            addProperty("model", model)
+            add("messages", messages)
+            addProperty("stream", true)
+        }
+
+        val chatUrl = "${baseUrl.trimEnd('/')}/chat/completions"
+        val request = Request.Builder()
+            .url(chatUrl)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody(JSON_MEDIA))
+            .build()
+
+        Log.d(TAG, "Custom API streaming chat request to $chatUrl")
+
+        val response = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute()
+        }
+
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: "Unknown error"
+            Log.e(TAG, "Custom API error: ${response.code} - $errorBody")
+            emit(StreamEvent.Error("请求失败 (${response.code}): $errorBody"))
+            return@flow
+        }
+
+        val reader = BufferedReader(InputStreamReader(response.body!!.byteStream()))
+        var fullText = StringBuilder()
+        var totalTokens = 0
+        var hasEmittedDone = false
+
+        try {
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                val l = line ?: continue
+                if (!l.startsWith("data:")) continue
+                val dataStr = l.removePrefix("data:").trim()
+                if (dataStr.isEmpty() || dataStr == "[DONE]") {
+                    if (dataStr == "[DONE]") {
+                        if (!hasEmittedDone && fullText.isNotEmpty()) {
+                            emit(StreamEvent.Done(fullText.toString(), "", ""))
+                            hasEmittedDone = true
+                        }
+                    }
+                    continue
+                }
+
+                try {
+                    val json = com.google.gson.JsonParser.parseString(dataStr).asJsonObject
+                    val choices = json.getAsJsonArray("choices")
+                    if (choices != null && choices.size() > 0) {
+                        val choice = choices[0].asJsonObject
+                        val delta = choice.getAsJsonObject("delta")
+                        val content = delta?.get("content")?.asString ?: ""
+                        if (content.isNotEmpty()) {
+                            fullText.append(content)
+                            emit(StreamEvent.Delta(content))
+                        }
+                    }
+                    val usage = json.getAsJsonObject("usage")
+                    if (usage != null) {
+                        totalTokens = usage.get("total_tokens")?.asInt ?: 0
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Parse Custom SSE error: ${e.message}")
+                }
+            }
+        } finally {
+            reader.close()
+            response.close()
+        }
+
+        if (!hasEmittedDone) {
+            if (fullText.isNotEmpty()) {
+                emit(StreamEvent.Done(fullText.toString(), "", ""))
+            } else {
+                emit(StreamEvent.Error("API 未返回内容，请检查配置"))
+            }
+        }
+
+        if (totalTokens == 0 && fullText.isNotEmpty()) {
+            totalTokens = fullText.length
         }
         if (totalTokens > 0) {
             emit(StreamEvent.TokenUsage(totalTokens, totalTokens / 2, totalTokens / 2))
