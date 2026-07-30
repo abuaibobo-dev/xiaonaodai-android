@@ -31,7 +31,8 @@ data class ChatMessage(
     val isUser: Boolean,
     val isSystem: Boolean = false,
     val imageUri: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val replyToId: Long? = null
 )
 
 @HiltViewModel
@@ -118,6 +119,18 @@ class AssistantViewModel @Inject constructor(
     // ============ Loading ============
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    // ============ 引用回复 ============
+    private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
+    val replyToMessage: StateFlow<ChatMessage?> = _replyToMessage.asStateFlow()
+
+    fun setReplyToMessage(msg: ChatMessage?) {
+        _replyToMessage.value = msg
+    }
+
+    fun clearReplyToMessage() {
+        _replyToMessage.value = null
+    }
 
     // ============ 状态 ============
     private val _statusMessage = MutableStateFlow<String?>(null)
@@ -235,14 +248,21 @@ class AssistantViewModel @Inject constructor(
         autoGenerateConversationName(text.ifEmpty { "[图片]" })
 
         // 添加用户消息到列表
+        val replyMsg = _replyToMessage.value
+        val replyPrefix = if (replyMsg != null) {
+            val preview = replyMsg.text.take(50).replace("\n", " ")
+            "[引用: ${preview}]\n\n"
+        } else ""
         val userMessage = ChatMessage(
             text = text.ifEmpty { "[图片]" },
             isUser = true,
-            imageUri = imageUri
+            imageUri = imageUri,
+            replyToId = replyMsg?.id
         )
         _messages.value = (_messages.value + userMessage).takeLast(100)
         _inputText.value = ""
         _pendingImageUri.value = null
+        _replyToMessage.value = null
         _isLoading.value = true
 
         // 保存用户消息到数据库
@@ -261,7 +281,7 @@ class AssistantViewModel @Inject constructor(
 
         // 构建消息内容（如果有图片，先分析图片）
         viewModelScope.launch {
-            var messageContent = text
+            var messageContent = replyPrefix + text
             if (imageUri != null) {
                 _statusMessage.value = "🖼️ 正在处理图片..."
                 val imageDescription = processImage(imageUri)
