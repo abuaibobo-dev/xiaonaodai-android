@@ -211,9 +211,7 @@ fun AssistantScreen(
     // 判断是否为空对话
     val isEmptyConversation = (messages.isEmpty() || (messages.size <= 1 && messages.all { !it.isUser })) && !isLoading
 
-    Column(modifier = Modifier.fillMaxSize().background(
-        Brush.verticalGradient(listOf(GlassColors.GradientStart, GlassColors.GradientEnd))
-    )) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF000000))) {
         if (isEmptyConversation) {
             // ============ 空对话：居中布局 ============
             Box(
@@ -467,7 +465,7 @@ private fun ReplyPreview(message: ChatMessage, onDismiss: () -> Unit) {
     }
 }
 
-// ============ 聊天输入栏 ============
+// ============ 聊天输入栏 - 玻璃拟态版 ============
 @Composable
 private fun ChatInputBar(
     inputText: String,
@@ -486,25 +484,27 @@ private fun ChatInputBar(
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(colors.border))
+            // 极细分隔线
+            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0x1AFFFFFF)))
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.background.copy(alpha = 0.85f))
+                    .background(Color(0x0A000000))
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
+                // 毛玻璃输入框容器
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(colors.surface)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0x1AFFFFFF))
                         .drawBehind {
-                            // 输入框玻璃边框发光
+                            // 极细高亮边框
                             drawRoundRect(
-                                color = GlassColors.BorderGlow,
-                                cornerRadius = CornerRadius(20.dp.toPx()),
-                                style = Stroke(width = 1.dp.toPx())
+                                color = Color(0x33FFFFFF),
+                                cornerRadius = CornerRadius(22.dp.toPx()),
+                                style = Stroke(width = 0.5.dp.toPx())
                             )
                         }
                 ) {
@@ -514,14 +514,14 @@ private fun ChatInputBar(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp, max = 140.dp)
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             androidx.compose.foundation.text.BasicTextField(
                                 value = inputText,
                                 onValueChange = onInputChange,
                                 textStyle = androidx.compose.ui.text.TextStyle(
                                     fontSize = 15.sp,
-                                    color = colors.textPrimary,
+                                    color = Color(0xFFE8E8E8),
                                     lineHeight = 22.sp
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
@@ -532,14 +532,14 @@ private fun ChatInputBar(
                                             androidx.compose.foundation.text.BasicText(
                                                 text = when {
                                                     !isChannelReady -> when (currentChannel) {
-                                                        "deepseek" -> "请先在设置中配置 DeepSeek API Key"
-                                                        else -> "请先在设置中配置 PAT 和 Bot ID"
+                                                        "deepseek" -> "请先配置 DeepSeek API Key"
+                                                        else -> "请先配置 PAT 和 Bot ID"
                                                     }
                                                     else -> "说点什么..."
                                                 },
                                                 style = androidx.compose.ui.text.TextStyle(
                                                     fontSize = 15.sp,
-                                                    color = colors.textTertiary,
+                                                    color = Color(0xFF666666),
                                                     lineHeight = 22.sp
                                                 )
                                             )
@@ -553,16 +553,16 @@ private fun ChatInputBar(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
+                                .padding(horizontal = 16.dp)
                                 .height(0.5.dp)
-                                .background(colors.border.copy(alpha = 0.4f))
+                                .background(Color(0x1AFFFFFF))
                         )
 
                         // 底部工具栏
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -571,48 +571,79 @@ private fun ChatInputBar(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
+                                // 附件按钮 - 玻璃拟态风格
                                 Box(
                                     modifier = Modifier
                                         .size(28.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF8A8A8A).copy(alpha = 0.25f))
+                                        .background(Color(0x1AFFFFFF))
+                                        .drawBehind {
+                                            drawCircle(
+                                                color = Color(0x33FFFFFF),
+                                                style = Stroke(width = 0.5.dp.toPx())
+                                            )
+                                        }
                                         .clickable { onPickImage() },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = "附件",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                        tint = Color(0xFF999999),
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
 
+                                // 通道指示器 - 玻璃标签
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(colors.surface.copy(alpha = 0.6f))
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0x1AFFFFFF))
                                         .clickable { onCycleChannel() }
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .padding(horizontal = 10.dp, vertical = 3.dp)
                                 ) {
-                                    Text(channelLabel, fontSize = 10.sp, color = colors.textTertiary)
+                                    Text(channelLabel, fontSize = 10.sp, color = Color(0xFF999999))
                                 }
                             }
 
-                            // 右侧：发送按钮
+                            // 右侧：发送按钮 - 玻璃拟态风格
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(34.dp)
                                     .clip(CircleShape)
-                                    .background(if (canSend) colors.accent else colors.border.copy(alpha = 0.3f))
+                                    .background(if (canSend) Color(0xCC7C5CFC) else Color(0x1AFFFFFF))
+                                    .drawBehind {
+                                        if (canSend) {
+                                            // 发送按钮发光边框
+                                            drawCircle(
+                                                color = Color(0x4D7C5CFC),
+                                                style = Stroke(width = 1.dp.toPx())
+                                            )
+                                        } else {
+                                            drawCircle(
+                                                color = Color(0x1AFFFFFF),
+                                                style = Stroke(width = 0.5.dp.toPx())
+                                            )
+                                        }
+                                    }
                                     .clickable(enabled = canSend) { onSend() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = "发送",
-                                    tint = if (canSend) Color.White else colors.textTertiary,
-                                    modifier = Modifier.size(15.dp)
-                                )
+                                if (canSend) {
+                                    Icon(
+                                        Icons.Default.Send,
+                                        contentDescription = "发送",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Send,
+                                        contentDescription = "发送",
+                                        tint = Color(0xFF666666),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -622,7 +653,7 @@ private fun ChatInputBar(
     }
 }
 
-// ============ 消息气泡 ============
+// ============ 消息气泡 - 玻璃拟态版 ============
 @Composable
 private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit = {}) {
     val colors = LocalAppColors.current
@@ -632,63 +663,66 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
         else parseMessageSegments(msg.text)
     }
 
-    // 玻璃拟态气泡
-    val userBubbleBg = colors.accent.copy(alpha = 0.75f)
-    val aiBubbleBg = colors.surface
+    // 玻璃拟态气泡配色
+    val userBubbleBg = Color(0xCC7C5CFC)    // 半透明蓝紫
+    val aiBubbleBg = Color(0x0FFFFFFF)       // 超高透玻璃
     val userTextColor = Color.White
-    val aiTextColor = colors.textPrimary
-
-    var showMenu by remember { mutableStateOf(false) }
+    val aiTextColor = Color(0xFFE8E8E8)      // 浅灰白
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
     ) {
         Column(
             horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start
         ) {
-            // 引用回复预览
-            if (msg.replyToId != null) {
-                val repliedMsg = remember(msg.replyToId) {
-                    // 通过context获取父Composable的messages可能不方便，从viewModel获取
-                }
-                // 实际引用内容在消息气泡内部渲染
-            }
-
             val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
             val bubbleShape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (msg.isUser) 16.dp else 4.dp,
-                bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (msg.isUser) 18.dp else 4.dp,
+                bottomEnd = if (msg.isUser) 4.dp else 18.dp
             )
+
+            // 气泡容器 - 带阴影和发光边框
             Box(
                 modifier = Modifier
                     .widthIn(max = maxWidth)
                     .clip(bubbleShape)
                     .background(if (msg.isUser) userBubbleBg else aiBubbleBg)
-                    .then(
-                        if (msg.isUser) Modifier.drawBehind {
-                            // 用户气泡：蓝紫发光边框
+                    .drawBehind {
+                        if (msg.isUser) {
+                            // 用户气泡：蓝紫发光边框 + 底部发光
                             drawRoundRect(
-                                color = GlassColors.BorderGlow,
-                                cornerRadius = CornerRadius(16.dp.toPx()),
+                                color = Color(0x4D7C5CFC),
+                                cornerRadius = CornerRadius(18.dp.toPx()),
                                 style = Stroke(width = 1.dp.toPx())
                             )
+                            // 底部柔和阴影
                             drawRoundRect(
-                                color = GlassColors.InnerGlow,
-                                cornerRadius = CornerRadius(16.dp.toPx()),
-                                style = Stroke(width = 3.dp.toPx())
+                                color = Color(0x1A7C5CFC),
+                                cornerRadius = CornerRadius(18.dp.toPx()),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, 2.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(size.width, size.height),
+                                style = Stroke(width = 4.dp.toPx())
                             )
-                        } else Modifier.drawBehind {
-                            // AI气泡：微光边框
+                        } else {
+                            // AI气泡：极细浅灰高亮边框（参考图风格）
                             drawRoundRect(
-                                color = colors.border.copy(alpha = 0.3f),
-                                cornerRadius = CornerRadius(16.dp.toPx()),
+                                color = Color(0x33FFFFFF),
+                                cornerRadius = CornerRadius(18.dp.toPx()),
                                 style = Stroke(width = 0.5.dp.toPx())
                             )
+                            // 底部柔和阴影
+                            drawRoundRect(
+                                color = Color(0x0A000000),
+                                cornerRadius = CornerRadius(18.dp.toPx()),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, 3.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(size.width, size.height),
+                                style = Stroke(width = 6.dp.toPx())
+                            )
                         }
-                    )
+                    }
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -706,11 +740,10 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
                             segments.forEach { segment ->
                                 when (segment) {
                                     is MessageSegment.TextSegment -> {
-                                        val textColor = if (msg.isUser) userTextColor else aiTextColor
                                         Text(
                                             text = segment.text,
                                             fontSize = 15.sp,
-                                            color = textColor,
+                                            color = if (msg.isUser) userTextColor else aiTextColor,
                                             lineHeight = 22.sp
                                         )
                                     }
@@ -728,88 +761,55 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
                 }
             }
 
-            // 消息操作栏：复制 / 引用回复 / 分享
+            // 消息操作栏：复制 / 引用 / 分享 - 玻璃拟态风格
             val context = LocalContext.current
             var copied by remember { mutableStateOf(false) }
-            // 通过 LocalContext 获取 Activity 以获取 ViewModel
-            val activity = context as? android.app.Activity
             Row(
-                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start
             ) {
-                // 复制
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("message", msg.text)
-                            clipboard.setPrimaryClip(clip)
-                            copied = true
-                            android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+                listOf(
+                    Triple(Icons.Default.ContentCopy, if (copied) "已复制" else "复制", {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("message", msg.text)
+                        clipboard.setPrimaryClip(clip)
+                        copied = true
+                        android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+                    }),
+                    Triple(Icons.Default.Reply, "引用", { onReply(msg) }),
+                    Triple(Icons.Default.Share, "分享", {
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, msg.text)
+                            type = "text/plain"
                         }
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "复制",
-                            tint = if (copied) colors.accent else colors.textTertiary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(Modifier.width(3.dp))
-                        Text(
-                            if (copied) "已复制" else "复制",
-                            fontSize = 10.sp,
-                            color = if (copied) colors.accent else colors.textTertiary
-                        )
-                    }
-                }
-
-                // 引用回复
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onReply(msg) }
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Reply,
-                            contentDescription = "引用回复",
-                            tint = colors.textTertiary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(Modifier.width(3.dp))
-                        Text("引用", fontSize = 10.sp, color = colors.textTertiary)
-                    }
-                }
-
-                // 分享
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            val sendIntent = android.content.Intent().apply {
-                                action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, msg.text)
-                                type = "text/plain"
-                            }
-                            context.startActivity(android.content.Intent.createChooser(sendIntent, "分享到"))
+                        context.startActivity(android.content.Intent.createChooser(sendIntent, "分享到"))
+                    })
+                ).forEach { (icon, label, onClick) ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x0AFFFFFF))
+                            .clickable { onClick() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = if (copied && label == "已复制") colors.accent else Color(0xFF666666),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                label,
+                                fontSize = 10.sp,
+                                color = if (copied && label == "已复制") colors.accent else Color(0xFF666666)
+                            )
                         }
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "分享",
-                            tint = colors.textTertiary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(Modifier.width(3.dp))
-                        Text("分享", fontSize = 10.sp, color = colors.textTertiary)
                     }
+                    Spacer(Modifier.width(4.dp))
                 }
             }
         }
