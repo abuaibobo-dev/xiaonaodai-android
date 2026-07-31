@@ -26,8 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.meitu.generator.ui.theme.GlassColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -91,7 +95,9 @@ fun MainScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-        Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
+        Column(modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(GlassColors.GradientStart, GlassColors.GradientEnd))
+        )) {
             val conversationName by assistantViewModel.conversationName.collectAsState()
             TopAppBar(
                 navController = navController,
@@ -285,7 +291,14 @@ private fun SidebarDrawer(
         modifier = Modifier
             .fillMaxHeight()
             .width(280.dp)
-            .background(colors.background)
+            .background(Color(0xCC0A0A1A))
+            .drawBehind {
+                drawRoundRect(
+                    color = GlassColors.BorderGlow.copy(alpha = 0.2f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(0f),
+                    style = Stroke(width = 0.5.dp.toPx())
+                )
+            }
             .padding(top = 16.dp)
     ) {
         // 导航项
@@ -348,7 +361,14 @@ private fun SidebarDrawer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(colors.surface.copy(alpha = 0.6f))
+                        .background(colors.surface)
+                        .drawBehind {
+                            drawRoundRect(
+                                color = GlassColors.BorderGlow.copy(alpha = 0.15f),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
+                                style = Stroke(width = 0.5.dp.toPx())
+                            )
+                        }
                         .clickable {
                             viewModel.switchToSession(session.sessionId)
                             onNavigate(Routes.ASSISTANT)
