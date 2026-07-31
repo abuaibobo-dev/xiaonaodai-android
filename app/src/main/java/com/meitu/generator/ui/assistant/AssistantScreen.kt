@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -334,7 +336,7 @@ private fun EmptyState() {
                     .drawBehind {
                         drawRoundRect(
                             color = GlassColors.BorderGlow,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx()),
+                            cornerRadius = CornerRadius(24.dp.toPx()),
                             style = Stroke(width = 1.dp.toPx())
                         )
                     },
@@ -358,7 +360,7 @@ private fun EmptyState() {
                     .drawBehind {
                         drawRoundRect(
                             color = GlassColors.BorderGlow.copy(alpha = 0.3f),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                            cornerRadius = CornerRadius(16.dp.toPx()),
                             style = Stroke(width = 0.5.dp.toPx())
                         )
                     }
@@ -501,7 +503,7 @@ private fun ChatInputBar(
                             // 输入框玻璃边框发光
                             drawRoundRect(
                                 color = GlassColors.BorderGlow,
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx()),
+                                cornerRadius = CornerRadius(20.dp.toPx()),
                                 style = Stroke(width = 1.dp.toPx())
                             )
                         }
@@ -670,19 +672,19 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
                             // 用户气泡：蓝紫发光边框
                             drawRoundRect(
                                 color = GlassColors.BorderGlow,
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                cornerRadius = CornerRadius(16.dp.toPx()),
                                 style = Stroke(width = 1.dp.toPx())
                             )
                             drawRoundRect(
                                 color = GlassColors.InnerGlow,
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                cornerRadius = CornerRadius(16.dp.toPx()),
                                 style = Stroke(width = 3.dp.toPx())
                             )
                         } else Modifier.drawBehind {
                             // AI气泡：微光边框
                             drawRoundRect(
                                 color = colors.border.copy(alpha = 0.3f),
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                cornerRadius = CornerRadius(16.dp.toPx()),
                                 style = Stroke(width = 0.5.dp.toPx())
                             )
                         }
