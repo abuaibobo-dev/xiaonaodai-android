@@ -109,9 +109,7 @@ fun SettingsScreen(
         viewModel.refreshTokenUsage()
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(
-        Brush.verticalGradient(listOf(GlassColors.GradientStart, GlassColors.GradientEnd))
-    )) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF000000))) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = Spacing.PagePadding, vertical = 16.dp),
