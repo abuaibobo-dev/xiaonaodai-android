@@ -906,6 +906,7 @@ fun SettingsScreen(
             ProviderPreset("Groq", "https://api.groq.com/openai/v1", "mixtral-8x7b-32768", "⚡"),
             ProviderPreset("Together AI", "https://api.together.xyz/v1", "mistralai/Mixtral-8x22B-Instruct-v0.1", "🔗"),
             ProviderPreset("Perplexity", "https://api.perplexity.ai", "sonar-pro", "🔍"),
+            ProviderPreset("Agnes AI", "https://apihub.agnes-ai.com/v1", "agnes-2.0-flash", "🌿"),
         )
 
         var selectedPresetIndex by remember { mutableStateOf(-1) }
