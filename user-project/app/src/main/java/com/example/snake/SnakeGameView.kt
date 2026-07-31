@@ -53,7 +53,7 @@ class SnakeGameView(context: Context) : View(context) {
         gameOverPaint.color = gameOverColor
         gameOverPaint.isAntiAlias = true
         gameOverPaint.textSize = 60f
-        gameOverPaint.isBold = true
+        gameOverPaint.isFakeBoldText = true
 
         scorePaint.color = scoreColor
         scorePaint.isAntiAlias = true
