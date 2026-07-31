@@ -26,7 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.meitu.generator.ui.theme.GlassColors
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -206,7 +209,9 @@ fun AssistantScreen(
     // 判断是否为空对话
     val isEmptyConversation = (messages.isEmpty() || (messages.size <= 1 && messages.all { !it.isUser })) && !isLoading
 
-    Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
+    Column(modifier = Modifier.fillMaxSize().background(
+        Brush.verticalGradient(listOf(GlassColors.GradientStart, GlassColors.GradientEnd))
+    )) {
         if (isEmptyConversation) {
             // ============ 空对话：居中布局 ============
             Box(
@@ -320,16 +325,47 @@ private fun EmptyState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("🧠", fontSize = 48.sp)
+            // 玻璃拟态头像容器
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(colors.surface)
+                    .drawBehind {
+                        drawRoundRect(
+                            color = GlassColors.BorderGlow,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx()),
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🧠", fontSize = 40.sp)
+            }
 
             Spacer(Modifier.height(8.dp))
 
             Text("布老师", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-            Text("你的专属 AI 助手", fontSize = 14.sp, color = colors.textTertiary)
+            Text("你的专属 AI 助手", fontSize = 14.sp, color = colors.textSecondary)
 
             Spacer(Modifier.height(24.dp))
 
-            Text("有什么想法直接说，我来帮你 💡", fontSize = 12.sp, color = colors.textTertiary)
+            // 玻璃拟态提示卡片
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colors.surface)
+                    .drawBehind {
+                        drawRoundRect(
+                            color = GlassColors.BorderGlow.copy(alpha = 0.3f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                            style = Stroke(width = 0.5.dp.toPx())
+                        )
+                    }
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                Text("有什么想法直接说，我来帮你 💡", fontSize = 14.sp, color = colors.textSecondary)
+            }
         }
     }
 }
@@ -453,7 +489,7 @@ private fun ChatInputBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.background)
+                    .background(colors.background.copy(alpha = 0.85f))
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Box(
@@ -461,7 +497,14 @@ private fun ChatInputBar(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
                         .background(colors.surface)
-                        .border(0.5.dp, colors.border, RoundedCornerShape(20.dp))
+                        .drawBehind {
+                            // 输入框玻璃边框发光
+                            drawRoundRect(
+                                color = GlassColors.BorderGlow,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx()),
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                        }
                 ) {
                     Column {
                         // 文本输入区域
@@ -587,11 +630,11 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
         else parseMessageSegments(msg.text)
     }
 
-    // 用户气泡→Coze蓝色，AI气泡→白色
-    val userBubbleBg = Color(0xFF1677FF)
-    val aiBubbleBg = Color(0xFFFFFFFF)
+    // 玻璃拟态气泡
+    val userBubbleBg = colors.accent.copy(alpha = 0.75f)
+    val aiBubbleBg = colors.surface
     val userTextColor = Color.White
-    val aiTextColor = Color(0xFF1A1A1A)
+    val aiTextColor = colors.textPrimary
 
     var showMenu by remember { mutableStateOf(false) }
 
@@ -611,18 +654,39 @@ private fun TextMessageBubble(msg: ChatMessage, onReply: (ChatMessage) -> Unit =
             }
 
             val maxWidth = if (segments.any { it is MessageSegment.CodeSegment }) 340.dp else 280.dp
+            val bubbleShape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                bottomEnd = if (msg.isUser) 4.dp else 16.dp
+            )
             Box(
                 modifier = Modifier
                     .widthIn(max = maxWidth)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 16.dp,
-                            topEnd = 16.dp,
-                            bottomStart = if (msg.isUser) 16.dp else 4.dp,
-                            bottomEnd = if (msg.isUser) 4.dp else 16.dp
-                        )
-                    )
+                    .clip(bubbleShape)
                     .background(if (msg.isUser) userBubbleBg else aiBubbleBg)
+                    .then(
+                        if (msg.isUser) Modifier.drawBehind {
+                            // 用户气泡：蓝紫发光边框
+                            drawRoundRect(
+                                color = GlassColors.BorderGlow,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                            drawRoundRect(
+                                color = GlassColors.InnerGlow,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                style = Stroke(width = 3.dp.toPx())
+                            )
+                        } else Modifier.drawBehind {
+                            // AI气泡：微光边框
+                            drawRoundRect(
+                                color = colors.border.copy(alpha = 0.3f),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(bubbleShape.topStart.toPx(), bubbleShape.topStart.toPx()),
+                                style = Stroke(width = 0.5.dp.toPx())
+                            )
+                        }
+                    )
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
