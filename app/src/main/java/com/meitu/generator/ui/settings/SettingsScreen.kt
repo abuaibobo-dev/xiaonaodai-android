@@ -793,6 +793,7 @@ fun SettingsScreen(
 
     // ============ PAT 编辑 弹窗 ============
     if (showPatDialog) {
+        val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { showPatDialog = false },
             containerColor = colors.surface,
@@ -802,7 +803,7 @@ fun SettingsScreen(
                     Text("从 Coze 获取 PAT 令牌", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { LocalUriHandler.current.openUri("https://www.coze.cn/open/oauth/pats") },
+                        onClick = { uriHandler.openUri("https://www.coze.cn/open/oauth/pats") },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -828,6 +829,7 @@ fun SettingsScreen(
 
     // ============ DeepSeek API Key 编辑弹窗 ============
     if (showDeepseekDialog) {
+        val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { showDeepseekDialog = false },
             containerColor = colors.surface,
@@ -837,7 +839,7 @@ fun SettingsScreen(
                     Text("从 DeepSeek 平台获取 API Key", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { LocalUriHandler.current.openUri("https://platform.deepseek.com/api_keys") },
+                        onClick = { uriHandler.openUri("https://platform.deepseek.com/api_keys") },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -1066,6 +1068,7 @@ fun SettingsScreen(
 
     // ============ HuggingFace Token 编辑弹窗 ============
     if (showHfTokenDialog) {
+        val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { showHfTokenDialog = false },
             containerColor = colors.surface,
@@ -1075,7 +1078,7 @@ fun SettingsScreen(
                     Text("从 HuggingFace 获取 Token（可选）", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { LocalUriHandler.current.openUri("https://huggingface.co/settings/tokens") },
+                        onClick = { uriHandler.openUri("https://huggingface.co/settings/tokens") },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -1137,6 +1140,7 @@ fun SettingsScreen(
 
     // ============ Server酱 Key 编辑弹窗 ============
     if (showServerchanDialog) {
+        val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { showServerchanDialog = false },
             containerColor = colors.surface,
@@ -1146,7 +1150,7 @@ fun SettingsScreen(
                     Text("从 Server酱 获取 SendKey", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { LocalUriHandler.current.openUri("https://sct.ftqq.com") },
+                        onClick = { uriHandler.openUri("https://sct.ftqq.com") },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -1172,6 +1176,7 @@ fun SettingsScreen(
 
     // ============ PushPlus Token 编辑弹窗 ============
     if (showPushplusDialog) {
+        val uriHandler = LocalUriHandler.current
         AlertDialog(
             onDismissRequest = { showPushplusDialog = false },
             containerColor = colors.surface,
@@ -1181,7 +1186,7 @@ fun SettingsScreen(
                     Text("从 PushPlus 获取 Token", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { LocalUriHandler.current.openUri("https://www.pushplus.plus") },
+                        onClick = { uriHandler.openUri("https://www.pushplus.plus") },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         shape = RoundedCornerShape(8.dp)
