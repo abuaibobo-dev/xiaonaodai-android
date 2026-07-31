@@ -58,9 +58,6 @@ class SnakeGameView(context: Context) : View(context) {
         scorePaint.color = scoreColor
         scorePaint.isAntiAlias = true
         scorePaint.textSize = 40f
-
-        // Initialize game
-        resetGame()
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -74,6 +71,7 @@ class SnakeGameView(context: Context) : View(context) {
     }
 
     private fun resetGame() {
+        if (cellSize <= 0) return
         // Reset snake to center
         snakeBody.clear()
         val centerX = (viewWidth - cellSize) / 2
@@ -96,8 +94,10 @@ class SnakeGameView(context: Context) : View(context) {
     }
 
     private fun generateFood() {
+        if (cellSize <= 0 || viewWidth <= cellSize || viewHeight <= cellSize) return
         val maxX = (viewWidth - cellSize) / cellSize
         val maxY = (viewHeight - cellSize) / cellSize
+        if (maxX <= 0 || maxY <= 0) return
 
         do {
             val foodX = (Math.random() * maxX).toInt() * cellSize
@@ -107,6 +107,7 @@ class SnakeGameView(context: Context) : View(context) {
     }
 
     private fun startGameLoop() {
+        runnable?.let { handler.removeCallbacks(it) }
         runnable = object : Runnable {
             override fun run() {
                 if (!isGameOver && !isPaused) {
@@ -118,6 +119,12 @@ class SnakeGameView(context: Context) : View(context) {
             }
         }
         handler.post(runnable!!)
+    }
+
+    private fun startLoopIfNeeded() {
+        if (!isGameOver && cellSize > 0) {
+            startGameLoop()
+        }
     }
 
     private fun moveSnake() {
@@ -212,7 +219,7 @@ class SnakeGameView(context: Context) : View(context) {
 
     fun resume() {
         isPaused = false
-        startGameLoop()
+        startLoopIfNeeded()
     }
 
     fun restart() {
