@@ -28,8 +28,8 @@ object Constants {
 
     // ============ App 信息 ============
     const val APP_NAME = "布老师"
-    const val APP_VERSION = "6.2.3"
-    const val APP_VERSION_CODE = 65
+    const val APP_VERSION = "6.2.6"
+    const val APP_VERSION_CODE = 67
 
     // ============ GitHub 配置 ============
     const val KEY_GITHUB_TOKEN = "github_token"
