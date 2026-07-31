@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
@@ -80,6 +81,7 @@ fun SettingsScreen(
     var showCustomApiDialog by remember { mutableStateOf(false) }
     var editingCustomApi by remember { mutableStateOf<CustomApiConfig?>(null) }
     var showGitHubTokenDialog by remember { mutableStateOf(false) }
+    var githubTokenInput by remember { mutableStateOf("") }
     var showGitHubCommits by remember { mutableStateOf<String?>(null) }
     var showHfTokenDialog by remember { mutableStateOf(false) }
     var hfTokenInput by remember { mutableStateOf("") }
@@ -797,7 +799,14 @@ fun SettingsScreen(
             title = { Text("设置 Coze API 令牌", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("从 coze.cn/open/oauth/pats 获取", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 Coze 获取 PAT 令牌", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "https://www.coze.cn/open/oauth/pats",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://www.coze.cn/open/oauth/pats") }
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = patInput, onValueChange = { patInput = it },
@@ -825,7 +834,14 @@ fun SettingsScreen(
             title = { Text("设置 DeepSeek API Key", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("从 platform.deepseek.com 获取", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 DeepSeek 平台获取 API Key", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "https://platform.deepseek.com/api_keys",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://platform.deepseek.com/api_keys") }
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = deepseekKeyInput, onValueChange = { deepseekKeyInput = it },
@@ -982,7 +998,14 @@ fun SettingsScreen(
             title = { Text("HuggingFace Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("从 huggingface.co/settings/tokens 获取（可选）", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 HuggingFace 获取 Token（可选）", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "https://huggingface.co/settings/tokens",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://huggingface.co/settings/tokens") }
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = hfTokenInput, onValueChange = { hfTokenInput = it },
@@ -1002,6 +1025,42 @@ fun SettingsScreen(
         )
     }
 
+    // ============ GitHub Token 编辑弹窗 ============
+    if (showGitHubTokenDialog) {
+        val uriHandler = LocalUriHandler.current
+        AlertDialog(
+            onDismissRequest = { showGitHubTokenDialog = false },
+            containerColor = colors.surface,
+            title = { Text("GitHub Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
+            text = {
+                Column {
+                    Text("从 GitHub Settings 获取 Personal Access Token", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "github.com/settings/tokens → 生成 → 勾选 repo 权限",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { uriHandler.openUri("https://github.com/settings/tokens") }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = githubTokenInput, onValueChange = { githubTokenInput = it },
+                        label = { Text("Token", color = colors.textTertiary) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                        ),
+                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewModel.saveGitHubToken(githubTokenInput.trim()); showGitHubTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)) { Text("保存") } },
+            dismissButton = { TextButton(onClick = { showGitHubTokenDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = colors.textTertiary)) { Text("取消") } }
+        )
+    }
+
     // ============ Server酱 Key 编辑弹窗 ============
     if (showServerchanDialog) {
         AlertDialog(
@@ -1010,7 +1069,14 @@ fun SettingsScreen(
             title = { Text("Server酱 SendKey", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("从 sct.ftqq.com 获取 SendKey", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 Server酱 获取 SendKey", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "https://sct.ftqq.com",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://sct.ftqq.com") }
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = serverchanInput, onValueChange = { serverchanInput = it },
@@ -1038,7 +1104,14 @@ fun SettingsScreen(
             title = { Text("PushPlus Token", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("从 www.pushplus.plus 获取 Token", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("从 PushPlus 获取 Token", fontSize = 13.sp, color = colors.textTertiary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "https://www.pushplus.plus",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://www.pushplus.plus") }
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = pushplusInput, onValueChange = { pushplusInput = it },
