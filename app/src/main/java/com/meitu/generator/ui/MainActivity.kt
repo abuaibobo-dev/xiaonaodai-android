@@ -95,9 +95,7 @@ fun MainScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-        Column(modifier = Modifier.fillMaxSize().background(
-            Brush.verticalGradient(listOf(GlassColors.GradientStart, GlassColors.GradientEnd))
-        )) {
+        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF000000))) {
             val conversationName by assistantViewModel.conversationName.collectAsState()
             TopAppBar(
                 navController = navController,
@@ -178,7 +176,7 @@ private fun TopAppBar(
     val colors = LocalAppColors.current
     var showClearConfirm by remember { mutableStateOf(false) }
     Surface(
-        color = colors.background,
+        color = Color(0xFF000000),
         shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth().statusBarsPadding()
     ) {
@@ -291,12 +289,14 @@ private fun SidebarDrawer(
         modifier = Modifier
             .fillMaxHeight()
             .width(280.dp)
-            .background(Color(0xCC0A0A1A))
+            .background(Color(0x1A000000))
             .drawBehind {
-                drawRoundRect(
-                    color = GlassColors.BorderGlow.copy(alpha = 0.2f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(0f),
-                    style = Stroke(width = 0.5.dp.toPx())
+                // 右侧边框线
+                drawLine(
+                    color = Color(0x1AFFFFFF),
+                    start = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+                    strokeWidth = 0.5.dp.toPx()
                 )
             }
             .padding(top = 16.dp)
@@ -361,10 +361,10 @@ private fun SidebarDrawer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(colors.surface)
+                        .background(Color(0x0FFFFFFF))
                         .drawBehind {
                             drawRoundRect(
-                                color = GlassColors.BorderGlow.copy(alpha = 0.15f),
+                                color = Color(0x1AFFFFFF),
                                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
                                 style = Stroke(width = 0.5.dp.toPx())
                             )
