@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">我的应用</string>
+    <string name="app_name">Snake Game</string>
+    <string name="score_label">Score: %1$d</string>
+    <string name="game_over">Game Over</string>
+    <string name="restart">Restart</string>
 </resources>
