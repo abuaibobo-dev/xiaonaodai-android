@@ -800,13 +800,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 Coze 获取 PAT 令牌", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "https://www.coze.cn/open/oauth/pats",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://www.coze.cn/open/oauth/pats") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { LocalUriHandler.current.openUri("https://www.coze.cn/open/oauth/pats") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 获取PAT", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = patInput, onValueChange = { patInput = it },
@@ -835,13 +835,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 DeepSeek 平台获取 API Key", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "https://platform.deepseek.com/api_keys",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://platform.deepseek.com/api_keys") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { LocalUriHandler.current.openUri("https://platform.deepseek.com/api_keys") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 获取API Key", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = deepseekKeyInput, onValueChange = { deepseekKeyInput = it },
@@ -891,11 +891,29 @@ fun SettingsScreen(
     // ============ 自定义 API 编辑弹窗 ============
     if (showCustomApiDialog) {
         val isEditing = editingCustomApi != null
+
+        data class ProviderPreset(val name: String, val baseUrl: String, val model: String, val emoji: String)
+        val presets = listOf(
+            ProviderPreset("OpenAI", "https://api.openai.com/v1", "gpt-4o", "🤖"),
+            ProviderPreset("DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash", "🧠"),
+            ProviderPreset("硅基流动", "https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-72B-Instruct", "⚡"),
+            ProviderPreset("通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-turbo", "🌐"),
+            ProviderPreset("月之暗面 Moonshot", "https://api.moonshot.cn/v1", "moonshot-v1-8k", "🌙"),
+            ProviderPreset("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4", "glm-4-plus", "🧪"),
+            ProviderPreset("Anthropic Claude", "https://api.anthropic.com/v1", "claude-3-5-sonnet-20241022", "🎯"),
+            ProviderPreset("Groq", "https://api.groq.com/openai/v1", "mixtral-8x7b-32768", "⚡"),
+            ProviderPreset("Together AI", "https://api.together.xyz/v1", "mistralai/Mixtral-8x22B-Instruct-v0.1", "🔗"),
+            ProviderPreset("Perplexity", "https://api.perplexity.ai", "sonar-pro", "🔍"),
+        )
+
+        var selectedPresetIndex by remember { mutableStateOf(-1) }
+        var showDropdown by remember { mutableStateOf(false) }
         var nameInput by remember { mutableStateOf(editingCustomApi?.name ?: "") }
         var urlInput by remember { mutableStateOf(editingCustomApi?.baseUrl ?: "") }
         var keyInput by remember { mutableStateOf(editingCustomApi?.apiKey ?: "") }
         var modelInput by remember { mutableStateOf(editingCustomApi?.model ?: "") }
         var emojiInput by remember { mutableStateOf(editingCustomApi?.emoji ?: "🔌") }
+        var showCustomFields by remember { mutableStateOf(isEditing) }
 
         AlertDialog(
             onDismissRequest = { showCustomApiDialog = false },
@@ -903,35 +921,63 @@ fun SettingsScreen(
             title = { Text(if (isEditing) "编辑自定义 API" else "添加自定义 API", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Medium) },
             text = {
                 Column {
-                    Text("支持任何 OpenAI 兼容的 API", fontSize = 13.sp, color = colors.textTertiary)
+                    Text("选择服务商，只需填写 API Key", fontSize = 13.sp, color = colors.textTertiary)
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = nameInput, onValueChange = { nameInput = it },
-                        label = { Text("名称", color = colors.textTertiary) },
-                        placeholder = { Text("如：OpenAI / 硅基流动", color = colors.textTertiary.copy(alpha = 0.5f)) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = urlInput, onValueChange = { urlInput = it },
-                        label = { Text("API Base URL", color = colors.textTertiary) },
-                        placeholder = { Text("https://api.openai.com/v1", color = colors.textTertiary.copy(alpha = 0.5f)) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
+
+                    // 下拉选择服务商
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        val selectedText = if (selectedPresetIndex >= 0) presets[selectedPresetIndex].emoji + " " + presets[selectedPresetIndex].name else "选择服务商..."
+                        OutlinedTextField(
+                            value = selectedText,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("服务商", color = colors.textTertiary) },
+                            trailingIcon = { Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, modifier = Modifier.clickable { showDropdown = !showDropdown }) },
+                            modifier = Modifier.fillMaxWidth().clickable { showDropdown = !showDropdown },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input)
+                        )
+                        DropdownMenu(
+                            expanded = showDropdown,
+                            onDismissRequest = { showDropdown = false },
+                            modifier = Modifier.fillMaxWidth(0.9f).background(colors.surface)
+                        ) {
+                            presets.forEachIndexed { index, preset ->
+                                DropdownMenuItem(
+                                    text = { Text("${preset.emoji} ${preset.name}", fontSize = 14.sp, color = colors.textPrimary) },
+                                    onClick = {
+                                        selectedPresetIndex = index
+                                        showDropdown = false
+                                        nameInput = preset.name
+                                        urlInput = preset.baseUrl
+                                        modelInput = preset.model
+                                        emojiInput = preset.emoji
+                                        showCustomFields = false
+                                    }
+                                )
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), color = colors.border)
+                            DropdownMenuItem(
+                                text = { Text("🔧 自定义（手动填写全部）", fontSize = 14.sp, color = colors.textTertiary) },
+                                onClick = {
+                                    selectedPresetIndex = -1
+                                    showDropdown = false
+                                    showCustomFields = true
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // API Key 输入（始终显示）
                     OutlinedTextField(
                         value = keyInput, onValueChange = { keyInput = it },
                         label = { Text("API Key", color = colors.textTertiary) },
+                        placeholder = { Text("sk-xxx", color = colors.textTertiary.copy(alpha = 0.5f)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -940,36 +986,64 @@ fun SettingsScreen(
                         ),
                         shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = modelInput, onValueChange = { modelInput = it },
-                        label = { Text("模型", color = colors.textTertiary) },
-                        placeholder = { Text("如：gpt-4o / deepseek-v4-flash", color = colors.textTertiary.copy(alpha = 0.5f)) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = emojiInput, onValueChange = { emojiInput = it },
-                        label = { Text("图标 (emoji)", color = colors.textTertiary) },
-                        placeholder = { Text("🔌", color = colors.textTertiary.copy(alpha = 0.5f)) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
-                        ),
-                        shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.width(80.dp)
-                    )
+
+                    // 自定义模式显示额外字段
+                    if (showCustomFields) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = nameInput, onValueChange = { nameInput = it },
+                            label = { Text("名称", color = colors.textTertiary) },
+                            placeholder = { Text("如：OpenAI / 硅基流动", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = urlInput, onValueChange = { urlInput = it },
+                            label = { Text("API Base URL", color = colors.textTertiary) },
+                            placeholder = { Text("https://api.openai.com/v1", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = modelInput, onValueChange = { modelInput = it },
+                            label = { Text("模型", color = colors.textTertiary) },
+                            placeholder = { Text("如：gpt-4o / deepseek-v4-flash", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = emojiInput, onValueChange = { emojiInput = it },
+                            label = { Text("图标 (emoji)", color = colors.textTertiary) },
+                            placeholder = { Text("🔌", color = colors.textTertiary.copy(alpha = 0.5f)) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                                focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, cursorColor = colors.accent
+                            ),
+                            shape = RoundedCornerShape(CornerRadius.Input), modifier = Modifier.width(80.dp)
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (nameInput.isNotBlank() && urlInput.isNotBlank() && keyInput.isNotBlank() && modelInput.isNotBlank()) {
+                        if (keyInput.isNotBlank() && (showCustomFields || selectedPresetIndex >= 0)) {
                             val config = CustomApiConfig(
                                 id = editingCustomApi?.id ?: java.util.UUID.randomUUID().toString(),
                                 name = nameInput.trim(),
@@ -999,13 +1073,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 HuggingFace 获取 Token（可选）", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "https://huggingface.co/settings/tokens",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://huggingface.co/settings/tokens") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { LocalUriHandler.current.openUri("https://huggingface.co/settings/tokens") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 获取Token", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = hfTokenInput, onValueChange = { hfTokenInput = it },
@@ -1035,13 +1109,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 GitHub Settings 获取 Personal Access Token", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "github.com/settings/tokens → 生成 → 勾选 repo 权限",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { uriHandler.openUri("https://github.com/settings/tokens") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { uriHandler.openUri("https://github.com/settings/tokens") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 生成Token", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = githubTokenInput, onValueChange = { githubTokenInput = it },
@@ -1070,13 +1144,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 Server酱 获取 SendKey", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "https://sct.ftqq.com",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://sct.ftqq.com") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { LocalUriHandler.current.openUri("https://sct.ftqq.com") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 获取SendKey", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = serverchanInput, onValueChange = { serverchanInput = it },
@@ -1105,13 +1179,13 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text("从 PushPlus 获取 Token", fontSize = 13.sp, color = colors.textTertiary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "https://www.pushplus.plus",
-                        color = colors.accent,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable { LocalUriHandler.current.openUri("https://www.pushplus.plus") }
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { LocalUriHandler.current.openUri("https://www.pushplus.plus") },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = Color.White),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("一键直达 获取Token", fontSize = 14.sp) }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = pushplusInput, onValueChange = { pushplusInput = it },
